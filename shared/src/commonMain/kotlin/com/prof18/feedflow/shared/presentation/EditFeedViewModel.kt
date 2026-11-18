@@ -59,6 +59,7 @@ class EditFeedViewModel internal constructor(
 ) : ViewModel() {
     val categoriesState = categoryUseCase.categoriesState
     private val originalFeedSourceState = MutableStateFlow<FeedSource?>(null)
+    val editingFeedSourceState = originalFeedSourceState.asStateFlow()
     private var originalFeedSource: FeedSource?
         get() = originalFeedSourceState.value
         set(value) {

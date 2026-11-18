@@ -19,6 +19,7 @@ internal fun ReadingBehaviorScreen(
     val browserManager = koinInject<BrowserManager>()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val browserListState by browserManager.browserListState.collectAsStateWithLifecycle()
+    val customTabsBrowser by browserManager.customTabsBrowserState.collectAsStateWithLifecycle()
     val strings = LocalFeedFlowStrings.current
 
     ReadingBehaviorScreenContent(
@@ -31,6 +32,9 @@ internal fun ReadingBehaviorScreen(
                 browser
             }
         }.toImmutableList(),
+        customTabsBrowsers = browserManager.customTabsBrowsers().toImmutableList(),
+        customTabsBrowserId = customTabsBrowser,
+        onCustomTabsBrowserSelected = browserManager::setCustomTabsBrowser,
         resolvedArticleBrowserId = browserManager.resolveArticleBrowserId(state.articleBrowserId),
         onBrowserSelected = { browser ->
             browserManager.setFavouriteBrowser(browser)

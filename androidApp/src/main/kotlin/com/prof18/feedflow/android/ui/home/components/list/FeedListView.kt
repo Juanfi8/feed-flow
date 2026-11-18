@@ -1,5 +1,6 @@
 package com.prof18.feedflow.android.ui.home.components.list
 
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -45,10 +46,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.prof18.feedflow.android.ArticleRedirectSettings
+import com.prof18.feedflow.android.R
 import com.prof18.feedflow.android.ui.icons.BookmarkIcon
 import com.prof18.feedflow.android.ui.icons.BookmarkOffIcon
 import com.prof18.feedflow.android.ui.preview.feedItemsForPreview
@@ -69,6 +74,7 @@ import com.prof18.feedflow.core.model.FeedLayout
 import com.prof18.feedflow.core.model.SwipeActionType
 import com.prof18.feedflow.core.model.SwipeActionType.NONE
 import com.prof18.feedflow.core.model.SwipeActionType.OPEN_IN_BROWSER
+import com.prof18.feedflow.core.model.SwipeActionType.OPEN_REDIRECTED
 import com.prof18.feedflow.core.model.SwipeActionType.TOGGLE_BOOKMARK_STATUS
 import com.prof18.feedflow.core.model.SwipeActionType.TOGGLE_READ_STATUS
 import com.prof18.feedflow.core.model.SwipeActions
@@ -309,6 +315,15 @@ private fun FeedListItem(
     onMarkAllBelowAsRead: (String) -> Unit,
     feedItemDisplaySettings: FeedItemDisplaySettings,
 ) {
+    val context = LocalContext.current
+    val redirectAction = {
+        val prefix = ArticleRedirectSettings(context).prefixForFeed(item.feedSource.id)
+        if (prefix == null) {
+            Toast.makeText(context, R.string.redirect_missing, Toast.LENGTH_LONG).show()
+        } else {
+            onOpenInBrowser(item.toSwipeActionUrlInfo().copy(url = prefix + item.url))
+        }
+    }
     val swipeBackgroundColor = when (feedLayout) {
         FeedLayout.LIST -> MaterialTheme.colorScheme.surfaceContainerHighest
         FeedLayout.CARD,
@@ -329,6 +344,7 @@ private fun FeedListItem(
             feedItem = item,
             swipeBackgroundColor = swipeBackgroundColor,
             onOpenInBrowser = onOpenInBrowser,
+            onRedirect = redirectAction,
             onBookmarkClick = onBookmarkClick,
             onReadStatusClick = onReadStatusClick,
         )
@@ -345,6 +361,7 @@ private fun FeedListItem(
             feedItem = item,
             swipeBackgroundColor = swipeBackgroundColor,
             onOpenInBrowser = onOpenInBrowser,
+            onRedirect = redirectAction,
             onBookmarkClick = onBookmarkClick,
             onReadStatusClick = onReadStatusClick,
         )
@@ -653,6 +670,7 @@ private fun SwipeActionType.toSwipeAction(
     feedItem: FeedItem,
     swipeBackgroundColor: Color,
     onOpenInBrowser: (FeedItemUrlInfo) -> Unit,
+    onRedirect: () -> Unit,
     onBookmarkClick: (FeedItemId, Boolean) -> Unit,
     onReadStatusClick: (FeedItemId, Boolean) -> Unit,
 ): SwipeAction? {
@@ -735,6 +753,22 @@ private fun SwipeActionType.toSwipeAction(
             )
         }
 
+        OPEN_REDIRECTED -> if (feedItem.url.isBlank()) {
+            null
+        } else {
+            SwipeAction(
+                icon = {
+                    Icon(
+                        modifier = Modifier.padding(Spacing.regular),
+                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = stringResource(R.string.redirect_open),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                },
+                background = swipeBackgroundColor,
+                onSwipe = onRedirect,
+            )
+        }
         NONE -> null
     }
 }

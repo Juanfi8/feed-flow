@@ -17,7 +17,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.prof18.feedflow.android.R
 import com.prof18.feedflow.android.settings.SettingsE2eIds
 import com.prof18.feedflow.android.ui.readermode.SliderWithPlusMinus
 import com.prof18.feedflow.android.ui.readermode.wholeValueSteps
@@ -272,6 +274,7 @@ internal fun FeedListSettingsScreenContent(
                             toggleReadLabel = strings.settingsSwipeActionToggleRead,
                             toggleBookmarkLabel = strings.settingsSwipeActionToggleBookmark,
                             openInBrowserLabel = strings.settingsSwipeActionOpenInBrowser,
+                            redirectLabel = stringResource(R.string.redirect_open),
                             noneLabel = strings.settingsSwipeActionNone,
                         ),
                         onOptionSelected = { action -> onSwipeActionSelected(SwipeDirection.LEFT, action) },
@@ -286,6 +289,7 @@ internal fun FeedListSettingsScreenContent(
                             toggleReadLabel = strings.settingsSwipeActionToggleRead,
                             toggleBookmarkLabel = strings.settingsSwipeActionToggleBookmark,
                             openInBrowserLabel = strings.settingsSwipeActionOpenInBrowser,
+                            redirectLabel = stringResource(R.string.redirect_open),
                             noneLabel = strings.settingsSwipeActionNone,
                         ),
                         onOptionSelected = { action -> onSwipeActionSelected(SwipeDirection.RIGHT, action) },
@@ -305,6 +309,7 @@ private fun swipeActionOptions(
     toggleBookmarkLabel: String,
     openInBrowserLabel: String,
     noneLabel: String,
+    redirectLabel: String,
 ): ImmutableList<SettingDropdownOption<SwipeActionType>> = persistentListOf(
     SettingDropdownOption(
         SwipeActionType.TOGGLE_READ_STATUS,
@@ -318,6 +323,7 @@ private fun swipeActionOptions(
         SwipeActionType.OPEN_IN_BROWSER,
         openInBrowserLabel,
     ),
+    SettingDropdownOption(SwipeActionType.OPEN_REDIRECTED, redirectLabel),
     SettingDropdownOption(
         SwipeActionType.NONE,
         noneLabel,

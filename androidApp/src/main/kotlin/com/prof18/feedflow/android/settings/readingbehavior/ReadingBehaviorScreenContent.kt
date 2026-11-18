@@ -15,10 +15,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.prof18.feedflow.android.R
 import com.prof18.feedflow.android.settings.SettingsE2eIds
 import com.prof18.feedflow.android.settings.components.BrowserSelector
+import com.prof18.feedflow.android.ui.settings.CompactSettingDropdownRow
 import com.prof18.feedflow.android.ui.settings.ConfirmationDialogConfig
+import com.prof18.feedflow.android.ui.settings.SettingDropdownOption
 import com.prof18.feedflow.android.ui.settings.SettingSwitchItem
 import com.prof18.feedflow.android.ui.style.Spacing
 import com.prof18.feedflow.android.ui.theme.FeedFlowTheme
@@ -28,12 +32,16 @@ import com.prof18.feedflow.core.model.Browser
 import com.prof18.feedflow.core.model.ReadingBehaviorState
 import com.prof18.feedflow.shared.presentation.preview.browsersForPreview
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 
 @Composable
 internal fun ReadingBehaviorScreenContent(
     navigateBack: () -> Unit,
     state: ReadingBehaviorState,
     browsers: ImmutableList<Browser>,
+    customTabsBrowsers: ImmutableList<Browser>,
+    customTabsBrowserId: String,
+    onCustomTabsBrowserSelected: (String) -> Unit,
     resolvedArticleBrowserId: String,
     onBrowserSelected: (Browser) -> Unit,
     onArticleBrowserSelected: (String) -> Unit,
@@ -88,6 +96,22 @@ internal fun ReadingBehaviorScreenContent(
                     onBrowserSelected = onBrowserSelected,
                 )
             }
+
+            item {
+                val defaultLabel = stringResource(R.string.custom_tabs_system_default)
+                val options = (
+                    listOf(SettingDropdownOption("", defaultLabel)) +
+                        customTabsBrowsers.map { SettingDropdownOption(it.id, it.name) }
+                    ).toImmutableList()
+                CompactSettingDropdownRow(
+                    title = stringResource(R.string.custom_tabs_browser),
+                    currentValue = customTabsBrowserId.takeIf { id -> options.any { it.value == id } }.orEmpty(),
+                    options = options,
+                    onOptionSelected = onCustomTabsBrowserSelected,
+                )
+            }
+
+            item { RedirectSettingsSection() }
 
             item {
                 SettingSwitchItem(
@@ -162,6 +186,9 @@ private fun ReadingBehaviorScreenContentPreview() {
                 isHideReadItemsEnabled = false,
             ),
             browsers = browsersForPreview,
+            customTabsBrowsers = browsersForPreview,
+            customTabsBrowserId = "",
+            onCustomTabsBrowserSelected = {},
             resolvedArticleBrowserId = browsersForPreview.first().id,
             onBrowserSelected = {},
             onArticleBrowserSelected = {},

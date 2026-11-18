@@ -2,6 +2,7 @@ package com.prof18.feedflow.android.editfeed
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,6 +38,7 @@ import com.prof18.feedflow.android.feed.ArticleOpenModeSelector
 import com.prof18.feedflow.android.feedverification.WebsiteVerificationExplanationDialog
 import com.prof18.feedflow.android.notifications.BackgroundRefreshTurnedOnSnackbar
 import com.prof18.feedflow.android.notifications.rememberNotificationPermission
+import com.prof18.feedflow.android.settings.readingbehavior.FeedRedirectSelector
 import com.prof18.feedflow.android.ui.feed.FeedFormE2eIds
 import com.prof18.feedflow.android.ui.feed.editfeed.EditFeedContent
 import com.prof18.feedflow.android.ui.preview.PreviewPhone
@@ -59,6 +61,7 @@ internal fun EditScreen(
     navigateBack: () -> Unit,
 ) {
     val feedUrl by viewModel.feedUrlState.collectAsStateWithLifecycle()
+    val editingFeedSource by viewModel.editingFeedSourceState.collectAsStateWithLifecycle()
     var verificationDialogUrl by remember { mutableStateOf<String?>(null) }
     DisposableEffect(viewModel) { onDispose { viewModel.cancelRecovery() } }
     val feedName by viewModel.feedNameState.collectAsStateWithLifecycle()
@@ -201,15 +204,17 @@ internal fun EditScreen(
                 viewModel.updateFeedNameTextFieldValue(name)
             },
             articleOpenModeSelector = { selectorModifier ->
-                ArticleOpenModeSelector(
-                    modifier = selectorModifier,
-                    currentMode = feedSourceSettings.articleOpenMode,
-                    onModeSelected = { articleOpenMode ->
-                        viewModel.updateArticleOpenMode(articleOpenMode)
-                    },
-                    articleBrowserName = articleBrowserName,
-                    allowDefault = true,
-                )
+                Column(modifier = selectorModifier) {
+                    ArticleOpenModeSelector(
+                        currentMode = feedSourceSettings.articleOpenMode,
+                        onModeSelected = { articleOpenMode ->
+                            viewModel.updateArticleOpenMode(articleOpenMode)
+                        },
+                        articleBrowserName = articleBrowserName,
+                        allowDefault = true,
+                    )
+                    FeedRedirectSelector(editingFeedSource?.id)
+                }
             },
             onHiddenToggled = { hidden ->
                 viewModel.updateIsHiddenFromTimeline(hidden)

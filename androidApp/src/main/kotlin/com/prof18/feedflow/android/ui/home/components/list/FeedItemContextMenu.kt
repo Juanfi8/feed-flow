@@ -1,5 +1,6 @@
 package com.prof18.feedflow.android.ui.home.components.list
 
+import android.widget.Toast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
@@ -20,7 +21,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.PopupProperties
+import com.prof18.feedflow.android.ArticleRedirectSettings
+import com.prof18.feedflow.android.BrowserManager
+import com.prof18.feedflow.android.R
 import com.prof18.feedflow.android.ui.components.ConfirmationDialog
 import com.prof18.feedflow.android.ui.home.components.ShareCommentsIcon
 import com.prof18.feedflow.android.ui.icons.BookmarkIcon
@@ -32,6 +38,7 @@ import com.prof18.feedflow.core.model.FeedItemId
 import com.prof18.feedflow.core.model.FeedItemUrlInfo
 import com.prof18.feedflow.core.model.FeedItemUrlTitle
 import com.prof18.feedflow.core.model.FeedSource
+import org.koin.core.context.GlobalContext
 
 @Composable
 internal fun FeedItemContextMenu(
@@ -49,6 +56,7 @@ internal fun FeedItemContextMenu(
     onMarkAllAboveAsRead: (String) -> Unit,
     onMarkAllBelowAsRead: (String) -> Unit,
 ) {
+    val context = LocalContext.current
     var showMarkAllAboveConfirmation by remember { mutableStateOf(false) }
     var showMarkAllBelowConfirmation by remember { mutableStateOf(false) }
 
@@ -117,6 +125,20 @@ internal fun FeedItemContextMenu(
         }
 
         if (feedItem.url.isNotBlank()) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.redirect_open)) },
+                leadingIcon = { Icon(Icons.Default.Public, contentDescription = null) },
+                onClick = {
+                    val prefix = ArticleRedirectSettings(context).prefixForFeed(feedItem.feedSource.id)
+                    if (prefix == null) {
+                        Toast.makeText(context, R.string.redirect_missing, Toast.LENGTH_LONG).show()
+                    } else {
+                        GlobalContext.get().get<BrowserManager>()
+                            .openArticleInBrowser(prefix + feedItem.url, context, preferAppHandler = false)
+                    }
+                    closeMenu()
+                },
+            )
             ShareMenuItem(
                 feedItem = feedItem,
                 shareMenuLabel = shareMenuLabel,

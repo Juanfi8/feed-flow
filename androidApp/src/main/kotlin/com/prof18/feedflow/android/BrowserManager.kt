@@ -35,6 +35,24 @@ class BrowserManager(
     )
     val browserListState = browserListMutableState.asStateFlow()
 
+    private val customTabsPreferences = context.getSharedPreferences("custom_tabs", Context.MODE_PRIVATE)
+    private val customTabsBrowserMutableState = MutableStateFlow(
+        customTabsPreferences.getString("provider", "").orEmpty(),
+    )
+    val customTabsBrowserState = customTabsBrowserMutableState.asStateFlow()
+
+    fun setCustomTabsBrowser(packageName: String) {
+        customTabsPreferences.edit().putString("provider", packageName).apply()
+        customTabsBrowserMutableState.value = packageName
+    }
+
+    fun customTabsBrowsers(): List<Browser> {
+        val serviceIntent = Intent("android.support.customtabs.action.CustomTabsService")
+        val providers = context.packageManager.queryIntentServices(serviceIntent, 0)
+            .map { it.serviceInfo.packageName }.toSet()
+        return browserListState.value.filter { it.id in providers }.distinctBy { it.id }
+    }
+
     init {
         populateBrowserList()
     }
@@ -156,10 +174,17 @@ class BrowserManager(
     fun openWithInAppBrowser(url: String, context: Context) {
         val uri = url.toUri()
         val intent = CustomTabsIntent.Builder().build()
-        getInAppBrowserPackage(uri)?.let { packageName ->
+        val selected = customTabsBrowserState.value
+        val available = customTabsBrowsers().any { it.id == selected }
+        (selected.takeIf { available } ?: getInAppBrowserPackage(uri))?.let { packageName ->
             intent.intent.setPackage(packageName)
         }
-        intent.launchUrl(context, uri)
+        try {
+            intent.launchUrl(context, uri)
+        } catch (e: ActivityNotFoundException) {
+            logger.e(e) { "Custom Tabs provider unavailable; opening with the default browser" }
+            openUrlWithDefaultBrowser(url, context)
+        }
     }
 
     // Without a default browser, an unpinned Custom Tab opens the system "Open with" chooser.

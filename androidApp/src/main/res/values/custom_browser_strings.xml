@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="custom_tabs_browser">In-app browser provider</string>
+    <string name="custom_tabs_system_default">System default</string>
+    <string name="redirect_none">None</string>
+    <string name="redirect_edit">Edit article redirect URLs</string>
+    <string name="redirect_default">Default article redirect</string>
+    <string name="redirect_one_per_line">One URL prefix per line</string>
+    <string name="redirect_invalid">Enter valid HTTP or HTTPS URL prefixes.</string>
+    <string name="redirect_open">Open with redirect</string>
+    <string name="redirect_missing">Choose a default redirect URL in reading settings first.</string>
+    <string name="redirect_feed">Article redirect</string>
+    <string name="redirect_use_default">Use default</string>
+    <string name="redirect_ordinary_taps">Open articles with redirect</string>
+    <string name="redirect_default_url">Default article redirect URL</string>
+    <string name="redirect_save_default">Save default redirect URL</string>
+</resources>

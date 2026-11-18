@@ -4,6 +4,7 @@ enum class SwipeActionType {
     TOGGLE_READ_STATUS,
     TOGGLE_BOOKMARK_STATUS,
     OPEN_IN_BROWSER,
+    OPEN_REDIRECTED,
     NONE,
 }
 

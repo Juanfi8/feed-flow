@@ -1,5 +1,6 @@
 package com.prof18.feedflow.android.ui.home.components.list
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
@@ -25,11 +27,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.prof18.feedflow.android.ArticleRedirectSettings
+import com.prof18.feedflow.android.R
 import com.prof18.feedflow.android.ui.feedsourcelist.singleAndLongClickModifier
 import com.prof18.feedflow.android.ui.preview.feedItemsForPreview
 import com.prof18.feedflow.android.ui.style.Spacing
 import com.prof18.feedflow.android.ui.utils.LocalFeedFlowStrings
 import com.prof18.feedflow.android.ui.utils.PreviewHelper
+import com.prof18.feedflow.core.model.ArticleOpenMode
 import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.FeedFontSizes
 import com.prof18.feedflow.core.model.FeedItem
@@ -72,23 +77,43 @@ internal fun FeedItemView(
         )
     }
 
+    val context = LocalContext.current
     val clickableItemModifier = if (disableClick) {
         Modifier
     } else {
         Modifier.singleAndLongClickModifier(
             onClick = {
-                onFeedItemClick(
-                    FeedItemUrlInfo(
-                        id = feedItem.id,
-                        url = feedItem.url,
-                        title = feedItem.title,
-                        isBookmarked = feedItem.isBookmarked,
-                        articleOpenMode = feedItem.feedSource.articleOpenMode,
-                        commentsUrl = feedItem.commentsUrl,
-                        imageUrl = feedItem.imageUrl,
-                        feedSourceTitle = feedItem.feedSource.title,
-                    ),
-                )
+                val redirectSettings = ArticleRedirectSettings(context)
+                val redirectEnabled = redirectSettings.redirectsOrdinaryTaps(feedItem.feedSource.id)
+                val prefix = if (redirectEnabled) {
+                    redirectSettings.prefixForFeed(feedItem.feedSource.id)
+                } else {
+                    null
+                }
+                if (redirectEnabled && prefix == null && feedItem.url.isNotBlank()) {
+                    Toast.makeText(context, R.string.redirect_missing, Toast.LENGTH_LONG).show()
+                } else {
+                    onFeedItemClick(
+                        FeedItemUrlInfo(
+                            id = feedItem.id,
+                            url = if (prefix != null && feedItem.url.isNotBlank()) {
+                                prefix + feedItem.url
+                            } else {
+                                feedItem.url
+                            },
+                            title = feedItem.title,
+                            isBookmarked = feedItem.isBookmarked,
+                            articleOpenMode = if (prefix != null && feedItem.url.isNotBlank()) {
+                                ArticleOpenMode.PREFERRED_BROWSER
+                            } else {
+                                feedItem.feedSource.articleOpenMode
+                            },
+                            commentsUrl = feedItem.commentsUrl,
+                            imageUrl = feedItem.imageUrl,
+                            feedSourceTitle = feedItem.feedSource.title,
+                        ),
+                    )
+                }
             },
             onLongClick = {
                 showItemMenu = true

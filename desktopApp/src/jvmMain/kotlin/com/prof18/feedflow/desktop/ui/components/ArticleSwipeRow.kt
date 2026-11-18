@@ -34,7 +34,7 @@ internal fun ArticleSwipeRow(
         val label: String
         val execute: () -> Unit
         when (type) {
-            SwipeActionType.NONE -> return null
+            SwipeActionType.NONE, SwipeActionType.OPEN_REDIRECTED -> return null
             SwipeActionType.TOGGLE_BOOKMARK_STATUS -> {
                 label = if (item.isBookmarked) strings.menuRemoveFromBookmark else strings.menuAddToBookmark
                 execute = { onBookmarkClick(FeedItemId(item.id), !item.isBookmarked) }
