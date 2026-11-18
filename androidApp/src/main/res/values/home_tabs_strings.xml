@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_tabs_all_feeds">All feeds</string>
+    <string name="home_tabs_all_in_tab">All</string>
+    <string name="home_tabs_unread_count">%1$s, %2$d unread</string>
+</resources>

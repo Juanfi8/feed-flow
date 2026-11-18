@@ -11,8 +11,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import com.prof18.feedflow.android.ui.utils.LocalFeedFlowStrings
+import com.prof18.feedflow.android.R
 import com.prof18.feedflow.android.ui.utils.PreviewHelper
 import com.prof18.feedflow.core.model.DrawerItem
 import com.prof18.feedflow.core.model.FeedFilter
@@ -42,7 +43,7 @@ internal fun DrawerTimelineItem(
         },
         label = {
             Text(
-                text = LocalFeedFlowStrings.current.drawerTitleTimeline,
+                text = stringResource(R.string.home_tabs_all_feeds),
             )
         },
         icon = {

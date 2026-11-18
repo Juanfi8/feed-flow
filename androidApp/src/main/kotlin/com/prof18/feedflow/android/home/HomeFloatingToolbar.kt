@@ -38,9 +38,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.prof18.feedflow.android.R
 import com.prof18.feedflow.android.home.drawer.DrawerE2eIds
 import com.prof18.feedflow.android.ui.icons.CloseSidebar
 import com.prof18.feedflow.android.ui.icons.CloseSidebarReversed
@@ -240,7 +242,7 @@ private fun FeedFilter.getTitle(): String =
     when (this) {
         is FeedFilter.Category -> this.feedCategory.title
         is FeedFilter.Source -> this.feedSource.title
-        FeedFilter.Timeline -> LocalFeedFlowStrings.current.appName
+        FeedFilter.Timeline -> stringResource(R.string.home_tabs_all_feeds)
         FeedFilter.Read -> LocalFeedFlowStrings.current.drawerTitleRead
         FeedFilter.Bookmarks -> LocalFeedFlowStrings.current.drawerTitleBookmarks
         FeedFilter.Uncategorized -> LocalFeedFlowStrings.current.noCategory

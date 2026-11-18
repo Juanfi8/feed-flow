@@ -18,7 +18,10 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
@@ -29,6 +32,9 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.prof18.feedflow.android.home.drawer.AndroidDrawer
+import com.prof18.feedflow.android.home.tabs.buildHomeTabs
+import com.prof18.feedflow.android.home.tabs.selectedTabIndex
+import com.prof18.feedflow.android.home.tabs.stepFrom
 import com.prof18.feedflow.android.ui.home.FeedListActions
 import com.prof18.feedflow.android.ui.home.FeedManagementActions
 import com.prof18.feedflow.android.ui.home.ShareBehavior
@@ -180,6 +186,29 @@ fun AdaptiveHomeView(
     } else {
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
         val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+        val homeTabs = remember(displayState.navDrawerState) { buildHomeTabs(displayState.navDrawerState) }
+        val selectedTabIndex = homeTabs.selectedTabIndex(displayState.currentFeedFilter)
+
+        fun openTab(index: Int) {
+            feedManagementActions.onFeedFilterSelected(homeTabs[index].filter)
+            scope.launch {
+                listState.scrollToItemConditionally(0, reduceMotionEnabled = reduceMotionEnabled)
+            }
+        }
+
+        // Swiping the list steps through the category tabs. From the first tab, the swipe toward
+        // the drawer keeps opening it, as it did before tabs existed.
+        val onSwipeTowardDrawer by rememberUpdatedState {
+            val previous = homeTabs.stepFrom(selectedTabIndex, forward = false)
+            if (previous != null) {
+                openTab(previous)
+            } else {
+                scope.launch { drawerState.open() }
+            }
+        }
+        val onSwipeAwayFromDrawer by rememberUpdatedState {
+            homeTabs.stepFrom(selectedTabIndex, forward = true)?.let(::openTab)
+        }
         HomeBackHandler(
             isDrawerOpen = drawerState.isOpenForBack,
             currentFeedFilter = displayState.currentFeedFilter,
@@ -237,7 +266,8 @@ fun AdaptiveHomeView(
                     // SwipeableActionsBox mirrors startActions in RTL, so rightSwipeAction is the
                     // drawer-opening row action in both layout directions.
                     drawerOpeningSwipeHasPriority = displayState.swipeActions.rightSwipeAction == NONE,
-                    onOpen = { scope.launch { drawerState.open() } },
+                    onSwipeTowardDrawer = { onSwipeTowardDrawer() },
+                    onSwipeAwayFromDrawer = { onSwipeAwayFromDrawer() },
                 ),
                 showDrawerMenu = true,
                 onDrawerMenuClick = {
@@ -278,14 +308,19 @@ fun AdaptiveHomeView(
 private fun Modifier.claimHorizontalDragsForDrawer(
     isRtl: Boolean,
     drawerOpeningSwipeHasPriority: Boolean,
-    onOpen: () -> Unit,
+    onSwipeTowardDrawer: () -> Unit,
+    onSwipeAwayFromDrawer: () -> Unit,
 ): Modifier = this
     .claimDisabledDrawerDirection(
         isRtl = isRtl,
         enabled = drawerOpeningSwipeHasPriority,
-        onOpen = onOpen,
+        onOpen = onSwipeTowardDrawer,
     )
-    .claimUnhandledHorizontalDrags(isRtl = isRtl, onOpen = onOpen)
+    .claimUnhandledHorizontalDrags(
+        isRtl = isRtl,
+        onSwipeTowardDrawer = onSwipeTowardDrawer,
+        onSwipeAwayFromDrawer = onSwipeAwayFromDrawer,
+    )
 
 private fun Modifier.claimDisabledDrawerDirection(
     isRtl: Boolean,
@@ -344,7 +379,8 @@ private suspend fun AwaitPointerEventScope.consumeUntilRelease(pointerId: Pointe
 
 private fun Modifier.claimUnhandledHorizontalDrags(
     isRtl: Boolean,
-    onOpen: () -> Unit,
+    onSwipeTowardDrawer: () -> Unit,
+    onSwipeAwayFromDrawer: () -> Unit,
 ): Modifier = pointerInput(isRtl) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
@@ -355,10 +391,8 @@ private fun Modifier.claimUnhandledHorizontalDrags(
             overSlop = slop
         } ?: return@awaitEachGesture
 
-        val opensDrawer = if (isRtl) overSlop < 0f else overSlop > 0f
-        if (opensDrawer) {
-            onOpen()
-        }
+        val towardDrawer = if (isRtl) overSlop < 0f else overSlop > 0f
+        if (towardDrawer) onSwipeTowardDrawer() else onSwipeAwayFromDrawer()
 
         horizontalDrag(drag.id) { change -> change.consume() }
     }

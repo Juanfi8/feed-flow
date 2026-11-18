@@ -49,10 +49,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.prof18.feedflow.android.home.tabs.HomeTabsLayer
+import com.prof18.feedflow.android.home.tabs.rememberHomeTabsController
 import com.prof18.feedflow.android.ui.components.ConfirmationDialog
 import com.prof18.feedflow.android.ui.home.FeedListActions
 import com.prof18.feedflow.android.ui.home.FeedManagementActions
@@ -119,6 +125,21 @@ fun AndroidHomeScreenContent(
         onMarkAllRead = feedListActions.markAllRead,
     )
 
+    val scrollToTop: () -> Unit = {
+        scope.launch {
+            scrollFeedToTop(
+                isGridArrangement = isGridArrangement,
+                listState = listState,
+                gridState = gridState,
+                reduceMotionEnabled = reduceMotionEnabled,
+            )
+        }
+    }
+    val selectFilter: (FeedFilter) -> Unit = { feedFilter ->
+        feedManagementActions.onFeedFilterSelected(feedFilter)
+        scrollToTop()
+    }
+
     @Suppress("MagicNumber")
     val showScrollToTopButton by remember {
         derivedStateOf {
@@ -133,6 +154,17 @@ fun AndroidHomeScreenContent(
     SideEffect(showScrollToTopButton) {
         feedListActions.onScrolledAwayFromTopChanged(showScrollToTopButton)
     }
+
+    val isListAtTop by remember {
+        derivedStateOf { isFeedAtTop(isGridArrangement, listState, gridState) }
+    }
+    val homeTabs = rememberHomeTabsController(
+        navDrawerState = displayState.navDrawerState,
+        currentFeedFilter = displayState.currentFeedFilter,
+        reduceMotionEnabled = reduceMotionEnabled,
+        isListAtTop = { isListAtTop },
+    )
+    val headerCollapse = homeTabs.collapse
 
     LaunchedEffect(isShowingEmptyFeed, hasFeedItems) {
         when {
@@ -193,13 +225,18 @@ fun AndroidHomeScreenContent(
         },
     ) { innerPadding ->
         val layoutDir = LocalLayoutDirection.current
-        val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() +
-            floatingToolbarHeight +
-            FloatingToolbarDefaults.ScreenOffset
+        val density = LocalDensity.current
+        val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val toolbarBottom = statusBarHeight + floatingToolbarHeight + FloatingToolbarDefaults.ScreenOffset
+        val topInset = homeTabs.headerBottom(toolbarBottom)
+        SideEffect(homeTabs, toolbarBottom, statusBarHeight) {
+            homeTabs.updateCollapseLimits(density, statusBarHeight, toolbarBottom)
+        }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .nestedScroll(headerCollapse.nestedScrollConnection)
                 .background(contentContainerColor)
                 .padding(start = innerPadding.calculateLeftPadding(layoutDir))
                 .padding(end = innerPadding.calculateRightPadding(layoutDir)),
@@ -272,7 +309,15 @@ fun AndroidHomeScreenContent(
                                     )
 
                                     Box(
-                                        modifier = feedListWidthModifier.fillMaxHeight(),
+                                        modifier = feedListWidthModifier
+                                            .fillMaxHeight()
+                                            .graphicsLayer {
+                                                translationX = homeTabs.slideTranslationPx(
+                                                    density = this,
+                                                    isRtl = layoutDir == LayoutDirection.Rtl,
+                                                )
+                                                alpha = homeTabs.slideAlpha()
+                                            },
                                     ) {
                                         FeedList(
                                             modifier = Modifier.fillMaxSize(),
@@ -326,6 +371,7 @@ fun AndroidHomeScreenContent(
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .height(topInset + scrimFeather)
+                    .graphicsLayer { translationY = -headerCollapse.offsetPx }
                     .zIndex(zIndex = 0.5f)
                     .background(
                         Brush.verticalGradient(
@@ -343,6 +389,7 @@ fun AndroidHomeScreenContent(
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .zIndex(zIndex = 0.75f)
+                    .graphicsLayer { translationY = -headerCollapse.offsetPx }
                     .padding(horizontal = Spacing.regular)
                     .padding(top = topInset + Spacing.small),
                 contentAlignment = Alignment.TopCenter,
@@ -365,10 +412,28 @@ fun AndroidHomeScreenContent(
                 )
             }
 
+            HomeTabsLayer(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .zIndex(zIndex = 0.9f),
+                controller = homeTabs,
+                currentFeedFilter = displayState.currentFeedFilter,
+                showCounts = !displayState.isUnreadCountHidden,
+                statusBarHeight = statusBarHeight,
+                toolbarBottom = toolbarBottom,
+                containerColor = contentContainerColor,
+                onFilterSelected = selectFilter,
+                onScrollToTop = scrollToTop,
+            )
+
             HomeFloatingToolbar(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .zIndex(1f),
+                    .zIndex(1f)
+                    .graphicsLayer {
+                        translationY = -headerCollapse.toolbarOffsetPx
+                        alpha = headerCollapse.toolbarAlpha
+                    },
                 displayState = displayState,
                 showDrawerMenu = showDrawerMenu,
                 isDrawerOpen = isDrawerOpen,
@@ -517,4 +582,14 @@ private suspend fun scrollFeedToTop(
     } else {
         listState.scrollToItemConditionally(0, reduceMotionEnabled = reduceMotionEnabled)
     }
+}
+
+private fun isFeedAtTop(
+    isGridArrangement: Boolean,
+    listState: LazyListState,
+    gridState: LazyStaggeredGridState,
+): Boolean = if (isGridArrangement) {
+    gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
+} else {
+    listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
 }
