@@ -8,6 +8,8 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -24,12 +26,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
+import com.prof18.feedflow.android.R
 import com.prof18.feedflow.android.ui.style.Spacing
 import com.prof18.feedflow.android.ui.utils.LocalFeedFlowStrings
 import com.prof18.feedflow.core.model.FeedFilter
+import com.prof18.feedflow.core.model.FeedLayout
 import com.prof18.feedflow.core.model.FeedSource
 
 @Composable
@@ -45,6 +50,8 @@ fun HomeAppBarDropdownMenu(
     onBackupClick: () -> Unit,
     onViewOptionsClick: () -> Unit,
     modifier: Modifier = Modifier,
+    feedLayout: FeedLayout? = null,
+    onFeedLayoutSelected: (FeedLayout) -> Unit = {},
 ) {
     var showMarkAllReadDialog by remember(feedFilter) { mutableStateOf(false) }
     var showClearOldArticlesDialog by remember { mutableStateOf(false) }
@@ -189,6 +196,29 @@ fun HomeAppBarDropdownMenu(
                 )
             },
         )
+
+        if (feedLayout != null) {
+            val nextStyle = feedLayout.nextFeedStyle()
+            DropdownMenuItem(
+                onClick = {
+                    closeMenu()
+                    onFeedLayoutSelected(nextStyle)
+                },
+                text = {
+                    Text(stringResource(R.string.feed_style_switch_to, stringResource(nextStyle.styleNameRes())))
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = if (nextStyle == FeedLayout.BIG_IMAGE) {
+                            Icons.Outlined.Dashboard
+                        } else {
+                            Icons.Outlined.ViewAgenda
+                        },
+                        contentDescription = null,
+                    )
+                },
+            )
+        }
 
         if (feedFilter is FeedFilter.Source) {
             DropdownMenuItem(

@@ -106,6 +106,9 @@ internal fun FeedListSettingsScreenContent(
                 ),
             )
 
+            // Magazine has no per-article swipe actions and shows times under day headings,
+            // so the swipe and date format settings only apply to List and Card.
+            val isMagazine = state.feedLayout == FeedLayout.BIG_IMAGE
             LazyColumn {
                 item {
                     Text(
@@ -134,10 +137,21 @@ internal fun FeedListSettingsScreenContent(
                         options = persistentListOf(
                             SettingDropdownOption(FeedLayout.LIST, strings.settingsFeedLayoutList),
                             SettingDropdownOption(FeedLayout.CARD, strings.settingsFeedLayoutCard),
-                            SettingDropdownOption(FeedLayout.BIG_IMAGE, strings.settingsFeedLayoutBigImage),
+                            SettingDropdownOption(FeedLayout.BIG_IMAGE, stringResource(R.string.feed_style_magazine)),
                         ),
                         onOptionSelected = setFeedLayout,
                     )
+                }
+
+                if (isMagazine) {
+                    item {
+                        Text(
+                            modifier = Modifier.padding(horizontal = Spacing.regular, vertical = Spacing.small),
+                            text = stringResource(R.string.feed_style_magazine_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
                 if (state.feedLayout.supportsGridToggle()) {
@@ -221,18 +235,20 @@ internal fun FeedListSettingsScreenContent(
                     )
                 }
 
-                item {
-                    CompactSettingDropdownRow(
-                        title = strings.dateFormatTitle,
-                        currentValue = state.dateFormat,
-                        options = persistentListOf(
-                            SettingDropdownOption(DateFormat.NORMAL, strings.dateFormatNormal),
-                            SettingDropdownOption(DateFormat.DAY_MONTH_DOT, strings.dateFormatDayMonthDot),
-                            SettingDropdownOption(DateFormat.AMERICAN, strings.dateFormatAmerican),
-                            SettingDropdownOption(DateFormat.ISO, strings.dateFormatIso),
-                        ),
-                        onOptionSelected = onDateFormatSelected,
-                    )
+                if (!isMagazine) {
+                    item {
+                        CompactSettingDropdownRow(
+                            title = strings.dateFormatTitle,
+                            currentValue = state.dateFormat,
+                            options = persistentListOf(
+                                SettingDropdownOption(DateFormat.NORMAL, strings.dateFormatNormal),
+                                SettingDropdownOption(DateFormat.DAY_MONTH_DOT, strings.dateFormatDayMonthDot),
+                                SettingDropdownOption(DateFormat.AMERICAN, strings.dateFormatAmerican),
+                                SettingDropdownOption(DateFormat.ISO, strings.dateFormatIso),
+                            ),
+                            onOptionSelected = onDateFormatSelected,
+                        )
+                    }
                 }
 
                 item {
@@ -266,34 +282,38 @@ internal fun FeedListSettingsScreenContent(
                     )
                 }
 
-                item {
-                    CompactSettingDropdownRow(
-                        title = strings.settingsLeftSwipeAction,
-                        currentValue = state.leftSwipeActionType,
-                        options = swipeActionOptions(
-                            toggleReadLabel = strings.settingsSwipeActionToggleRead,
-                            toggleBookmarkLabel = strings.settingsSwipeActionToggleBookmark,
-                            openInBrowserLabel = strings.settingsSwipeActionOpenInBrowser,
-                            redirectLabel = stringResource(R.string.redirect_open),
-                            noneLabel = strings.settingsSwipeActionNone,
-                        ),
-                        onOptionSelected = { action -> onSwipeActionSelected(SwipeDirection.LEFT, action) },
-                    )
+                if (!isMagazine) {
+                    item {
+                        CompactSettingDropdownRow(
+                            title = strings.settingsLeftSwipeAction,
+                            currentValue = state.leftSwipeActionType,
+                            options = swipeActionOptions(
+                                toggleReadLabel = strings.settingsSwipeActionToggleRead,
+                                toggleBookmarkLabel = strings.settingsSwipeActionToggleBookmark,
+                                openInBrowserLabel = strings.settingsSwipeActionOpenInBrowser,
+                                redirectLabel = stringResource(R.string.redirect_open),
+                                noneLabel = strings.settingsSwipeActionNone,
+                            ),
+                            onOptionSelected = { action -> onSwipeActionSelected(SwipeDirection.LEFT, action) },
+                        )
+                    }
                 }
 
-                item {
-                    CompactSettingDropdownRow(
-                        title = strings.settingsRightSwipeAction,
-                        currentValue = state.rightSwipeActionType,
-                        options = swipeActionOptions(
-                            toggleReadLabel = strings.settingsSwipeActionToggleRead,
-                            toggleBookmarkLabel = strings.settingsSwipeActionToggleBookmark,
-                            openInBrowserLabel = strings.settingsSwipeActionOpenInBrowser,
-                            redirectLabel = stringResource(R.string.redirect_open),
-                            noneLabel = strings.settingsSwipeActionNone,
-                        ),
-                        onOptionSelected = { action -> onSwipeActionSelected(SwipeDirection.RIGHT, action) },
-                    )
+                if (!isMagazine) {
+                    item {
+                        CompactSettingDropdownRow(
+                            title = strings.settingsRightSwipeAction,
+                            currentValue = state.rightSwipeActionType,
+                            options = swipeActionOptions(
+                                toggleReadLabel = strings.settingsSwipeActionToggleRead,
+                                toggleBookmarkLabel = strings.settingsSwipeActionToggleBookmark,
+                                openInBrowserLabel = strings.settingsSwipeActionOpenInBrowser,
+                                redirectLabel = stringResource(R.string.redirect_open),
+                                noneLabel = strings.settingsSwipeActionNone,
+                            ),
+                            onOptionSelected = { action -> onSwipeActionSelected(SwipeDirection.RIGHT, action) },
+                        )
+                    }
                 }
 
                 item {
@@ -330,8 +350,8 @@ private fun swipeActionOptions(
     ),
 )
 
-private fun FeedLayout.supportsGridToggle(): Boolean =
-    this == FeedLayout.CARD || this == FeedLayout.BIG_IMAGE
+// Magazine is always a single column, so only Card can switch to a grid.
+private fun FeedLayout.supportsGridToggle(): Boolean = this == FeedLayout.CARD
 
 @Preview
 @Composable

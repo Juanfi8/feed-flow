@@ -52,8 +52,10 @@ import com.prof18.feedflow.android.ui.utils.LocalFeedFlowStrings
 import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.FeedOrder
 import com.prof18.feedflow.core.model.FeedSource
+import com.prof18.feedflow.shared.presentation.FeedListSettingsViewModel
 import com.prof18.feedflow.shared.presentation.model.HomeDisplayState
 import com.prof18.feedflow.shared.presentation.model.HomeViewMenuState
+import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -246,6 +248,7 @@ internal fun HomeToolbarActions(
     val viewOptionsSheetState = rememberModalBottomSheetState()
     val strings = LocalFeedFlowStrings.current
     val currentFeedFilter = displayState.currentFeedFilter
+    val feedListSettingsViewModel = koinViewModel<FeedListSettingsViewModel>()
 
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         IconButton(
@@ -286,6 +289,8 @@ internal fun HomeToolbarActions(
                     onBackupClick()
                 },
                 onViewOptionsClick = { showViewOptionsSheet = true },
+                feedLayout = displayState.feedLayout,
+                onFeedLayoutSelected = feedListSettingsViewModel::updateFeedLayout,
             )
         }
     }

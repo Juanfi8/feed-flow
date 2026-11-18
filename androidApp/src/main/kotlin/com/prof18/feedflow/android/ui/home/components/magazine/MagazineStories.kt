@@ -74,7 +74,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Date
 import java.util.Locale
 
 private const val TILE_IMAGE_RATIO = 4f / 3f
@@ -101,6 +100,8 @@ internal data class MagazineStoryActions(
     val onOpenFeedWebsite: (String) -> Unit,
     val onMarkAllAboveAsRead: (String) -> Unit,
     val onMarkAllBelowAsRead: (String) -> Unit,
+    /** False for previews: no taps, no long-press menu. */
+    val isInteractive: Boolean = true,
 )
 
 @Composable
@@ -160,7 +161,7 @@ internal fun MagazineLead(item: FeedItem, actions: MagazineStoryActions, modifie
                     )
                 }
                 item.subtitle?.let { summary ->
-                    Summary(summary, item, actions, maxLines = 3)
+                    Summary(summary, item, actions, maxLines = actions.displaySettings.descriptionLineLimit.lines)
                 }
             }
         }
@@ -255,7 +256,9 @@ internal fun MagazineTextCard(item: FeedItem, actions: MagazineStoryActions, mod
         ) {
             SourceLine(item, actions)
             StoryTitle(item, actions, sizeOffset = 1, maxLines = 4)
-            item.subtitle?.let { summary -> Summary(summary, item, actions, maxLines = 3) }
+            item.subtitle?.let { summary ->
+                Summary(summary, item, actions, maxLines = actions.displaySettings.descriptionLineLimit.lines)
+            }
         }
     }
 }
@@ -442,14 +445,19 @@ private fun StoryContainer(
 ) {
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
+    val interaction = if (actions.isInteractive) {
+        Modifier.singleAndLongClickModifier(
+            onClick = { item.toClickUrlInfo(context)?.let(actions.onFeedItemClick) },
+            onLongClick = { showMenu = true },
+        )
+    } else {
+        Modifier
+    }
     Box(
         modifier = modifier
             .clip(shape)
             .testTag(FeedItemE2eIds.row(item.id))
-            .singleAndLongClickModifier(
-                onClick = { item.toClickUrlInfo(context)?.let(actions.onFeedItemClick) },
-                onLongClick = { showMenu = true },
-            ),
+            .then(interaction),
     ) {
         content()
         FeedItemContextMenu(
@@ -562,15 +570,17 @@ private fun Summary(summary: String, item: FeedItem, actions: MagazineStoryActio
     )
 }
 
-/** "12 min" or "3 h" for today's stories, the clock time for older ones. */
+/** "12 min" or "3 h" for today's stories, the clock time for older ones, nothing when dates are hidden. */
 @Composable
 @ReadOnlyComposable
 private fun storyTime(item: FeedItem, todayEpochDay: Long): String {
-    val millis = item.pubDateMillis ?: return item.dateString.orEmpty()
-    val context = LocalContext.current
-    val zone = ZoneId.systemDefault()
-    val day = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().toEpochDay()
-    if (day != todayEpochDay) return DateFormat.getTimeFormat(context).format(Date(millis))
+    // A missing date string means the reader turned dates off.
+    val dateString = item.dateString ?: return ""
+    val millis = item.pubDateMillis ?: return dateString
+    val day = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
+    // Older stories sit under their day heading, so only the time part of the app's
+    // formatted date is needed; it follows the 12/24-hour setting.
+    if (day != todayEpochDay) return dateString.substringAfterLast(" - ")
     val minutes = ((System.currentTimeMillis() - millis) / MILLIS_PER_MINUTE).toInt()
     return when {
         minutes < 1 -> stringResource(R.string.magazine_time_now)
@@ -592,3 +602,38 @@ private fun dayLabel(epochDay: Long, todayEpochDay: Long): String = when (epochD
 }
 
 private val RectangleShapeCompat: Shape = androidx.compose.ui.graphics.RectangleShape
+
+/** Two sample tiles showing the Magazine style in the feed settings. */
+@Composable
+internal fun MagazineStylePreview(
+    sample: FeedItem,
+    feedFontSize: FeedFontSizes,
+    displaySettings: FeedItemDisplaySettings,
+    modifier: Modifier = Modifier,
+) {
+    val actions = remember(feedFontSize, displaySettings) {
+        MagazineStoryActions(
+            currentFeedFilter = FeedFilter.Timeline,
+            feedFontSize = feedFontSize,
+            displaySettings = displaySettings,
+            shareMenuLabel = "",
+            shareCommentsMenuLabel = "",
+            onFeedItemClick = {},
+            onBookmarkClick = { _, _ -> },
+            onReadStatusClick = { _, _ -> },
+            onCommentClick = {},
+            onShareClick = {},
+            onOpenFeedSettings = {},
+            onOpenFeedWebsite = {},
+            onMarkAllAboveAsRead = {},
+            onMarkAllBelowAsRead = {},
+            isInteractive = false,
+        )
+    }
+    MagazinePair(
+        modifier = modifier,
+        first = sample,
+        second = sample.copy(id = "${sample.id}-second", isRead = true),
+        actions = actions,
+    )
+}

@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.prof18.feedflow.android.ui.home.components.list.FeedItemContainer
 import com.prof18.feedflow.android.ui.home.components.list.FeedItemView
+import com.prof18.feedflow.android.ui.home.components.magazine.MagazineStylePreview
 import com.prof18.feedflow.android.ui.style.Spacing
 import com.prof18.feedflow.android.ui.utils.LocalFeedFlowStrings
 import com.prof18.feedflow.core.model.ArticleOpenMode
@@ -39,7 +40,70 @@ fun FeedItemPreview(
     modifier: Modifier = Modifier,
     feedItemDisplaySettings: FeedItemDisplaySettings = FeedItemDisplaySettings(),
 ) {
-    val isCompactImageCardPreview = feedLayout == FeedLayout.BIG_IMAGE || feedLayout == FeedLayout.GRID
+    val sampleItem = FeedItem(
+        id = "1",
+        url = "https://www.example.com",
+        title = LocalFeedFlowStrings.current.settingsFontScaleTitleExample,
+        subtitle = if (isHideDescriptionEnabled) {
+            null
+        } else {
+            LocalFeedFlowStrings.current.settingsFontScaleSubtitleExample
+        },
+        content = null,
+        imageUrl = if (isHideImagesEnabled) null else "https://lipsum.app/200x200",
+        feedSource = FeedSource(
+            id = "1",
+            url = "https://www.example.it",
+            title = LocalFeedFlowStrings.current.settingsFontScaleFeedSourceExample,
+            category = null,
+            lastSyncTimestamp = null,
+            logoUrl = null,
+            websiteUrl = null,
+            articleOpenMode = ArticleOpenMode.DEFAULT,
+            isHiddenFromTimeline = false,
+            isPinned = false,
+            isNotificationEnabled = false,
+            isHideImagesEnabled = false,
+            fetchFailed = false,
+        ),
+        pubDateMillis = null,
+        dateString = if (isHideDateEnabled) {
+            null
+        } else {
+            val datePart = when (dateFormat) {
+                DateFormat.NORMAL -> "25/12"
+                DateFormat.DAY_MONTH_DOT -> "25.12"
+                DateFormat.AMERICAN -> "12/25"
+                DateFormat.ISO -> "2025-12-25"
+            }
+            val timePart = when (timeFormat) {
+                TimeFormat.HOURS_24 -> "14:30"
+                TimeFormat.HOURS_12 -> "2:30 PM"
+            }
+            "$datePart - $timePart"
+        },
+        commentsUrl = null,
+        isRead = false,
+        isBookmarked = false,
+    )
+    if (feedLayout == FeedLayout.BIG_IMAGE) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .padding(vertical = Spacing.small),
+            contentAlignment = Alignment.Center,
+        ) {
+            MagazineStylePreview(
+                modifier = Modifier.widthIn(max = FeedItemPreviewMaxWidth),
+                sample = sampleItem,
+                feedFontSize = fontSizes,
+                displaySettings = feedItemDisplaySettings,
+            )
+        }
+        return
+    }
+    val isCompactImageCardPreview = feedLayout == FeedLayout.GRID
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -61,52 +125,7 @@ fun FeedItemPreview(
             FeedItemView(
                 modifier = Modifier
                     .background(MaterialTheme.colorScheme.background),
-                feedItem = FeedItem(
-                    id = "1",
-                    url = "https://www.example.com",
-                    title = LocalFeedFlowStrings.current.settingsFontScaleTitleExample,
-                    subtitle = if (isHideDescriptionEnabled) {
-                        null
-                    } else {
-                        LocalFeedFlowStrings.current.settingsFontScaleSubtitleExample
-                    },
-                    content = null,
-                    imageUrl = if (isHideImagesEnabled) null else "https://lipsum.app/200x200",
-                    feedSource = FeedSource(
-                        id = "1",
-                        url = "https://www.example.it",
-                        title = LocalFeedFlowStrings.current.settingsFontScaleFeedSourceExample,
-                        category = null,
-                        lastSyncTimestamp = null,
-                        logoUrl = null,
-                        websiteUrl = null,
-                        articleOpenMode = ArticleOpenMode.DEFAULT,
-                        isHiddenFromTimeline = false,
-                        isPinned = false,
-                        isNotificationEnabled = false,
-                        isHideImagesEnabled = false,
-                        fetchFailed = false,
-                    ),
-                    pubDateMillis = null,
-                    dateString = if (isHideDateEnabled) {
-                        null
-                    } else {
-                        val datePart = when (dateFormat) {
-                            DateFormat.NORMAL -> "25/12"
-                            DateFormat.DAY_MONTH_DOT -> "25.12"
-                            DateFormat.AMERICAN -> "12/25"
-                            DateFormat.ISO -> "2025-12-25"
-                        }
-                        val timePart = when (timeFormat) {
-                            TimeFormat.HOURS_24 -> "14:30"
-                            TimeFormat.HOURS_12 -> "2:30 PM"
-                        }
-                        "$datePart - $timePart"
-                    },
-                    commentsUrl = null,
-                    isRead = false,
-                    isBookmarked = false,
-                ),
+                feedItem = sampleItem,
                 feedFontSize = fontSizes,
                 shareCommentsMenuLabel = LocalFeedFlowStrings.current.menuShareComments,
                 shareMenuLabel = LocalFeedFlowStrings.current.menuShare,

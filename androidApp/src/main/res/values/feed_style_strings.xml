@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feed_style_list">List</string>
+    <string name="feed_style_card">Card</string>
+    <string name="feed_style_magazine">Magazine</string>
+    <string name="feed_style_switch_to">Switch to %1$s style</string>
+    <string name="feed_style_magazine_hint">Magazine groups articles by day and folds read ones away. Swipe the feed left or right to change category; article swipe actions apply to List and Card.</string>
+</resources>
