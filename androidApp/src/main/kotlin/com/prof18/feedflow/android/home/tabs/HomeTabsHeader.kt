@@ -59,7 +59,7 @@ import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.FeedSource
 import kotlinx.collections.immutable.ImmutableList
 
-internal val HomeTabStripHeight = 44.dp
+internal val HomeTabBarHeight = 56.dp
 internal val HomeFeedChipsHeight = 48.dp
 
 // How far a finger travels along the strip to move one tab.
@@ -99,7 +99,7 @@ internal fun HomeTabStrip(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(HomeTabStripHeight)
+            .height(HomeTabBarHeight)
             .pointerInput(lastIndex, isRtl) {
                 val stepPx = tabDragStep.toPx()
                 var accumulated = 0f
@@ -135,8 +135,7 @@ internal fun HomeTabStrip(
                     }
                 }
             }
-            .horizontalScroll(scrollState, enabled = false)
-            .padding(horizontal = Spacing.small),
+            .horizontalScroll(scrollState, enabled = false),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         tabs.forEachIndexed { index, tab ->

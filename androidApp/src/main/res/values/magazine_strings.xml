@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="magazine_today">Today</string>
+    <string name="magazine_yesterday">Yesterday</string>
+    <string name="magazine_unread_count">%1$d unread</string>
+    <string name="magazine_quick_reads">Quick reads</string>
+    <string name="magazine_read_group">Read · %1$d</string>
+    <string name="magazine_read_group_expand">Show read articles</string>
+    <string name="magazine_read_group_collapse">Hide read articles</string>
+    <string name="magazine_show_more">Show %1$d more</string>
+    <string name="magazine_time_now">Now</string>
+    <string name="magazine_time_minutes">%1$d min</string>
+    <string name="magazine_time_hours">%1$d h</string>
+</resources>

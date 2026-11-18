@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.prof18.feedflow.android.home.tabs.HomeTabsController
 import com.prof18.feedflow.android.home.tabs.HomeTabsLayer
 import com.prof18.feedflow.android.home.tabs.rememberHomeTabsController
 import com.prof18.feedflow.android.ui.components.ConfirmationDialog
@@ -66,8 +67,8 @@ import com.prof18.feedflow.android.ui.home.ShareBehavior
 import com.prof18.feedflow.android.ui.home.components.EmptyFeedView
 import com.prof18.feedflow.android.ui.home.components.NoFeedsSourceView
 import com.prof18.feedflow.android.ui.home.components.ScrollToTopButton
-import com.prof18.feedflow.android.ui.home.components.list.FeedList
 import com.prof18.feedflow.android.ui.home.components.list.FeedListMaxContentWidth
+import com.prof18.feedflow.android.ui.home.components.magazine.HomeFeedList
 import com.prof18.feedflow.android.ui.style.Spacing
 import com.prof18.feedflow.android.ui.utils.LocalFeedFlowStrings
 import com.prof18.feedflow.android.ui.utils.LocalReduceMotion
@@ -76,6 +77,7 @@ import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.FeedItemId
 import com.prof18.feedflow.core.model.FeedLayout
 import com.prof18.feedflow.core.model.FeedOrder
+import com.prof18.feedflow.core.model.FeedSource
 import com.prof18.feedflow.core.model.NoFeedSourcesStatus
 import com.prof18.feedflow.shared.presentation.model.HomeDisplayState
 import com.prof18.feedflow.shared.presentation.model.HomeViewMenuState
@@ -228,9 +230,9 @@ fun AndroidHomeScreenContent(
         val density = LocalDensity.current
         val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val toolbarBottom = statusBarHeight + floatingToolbarHeight + FloatingToolbarDefaults.ScreenOffset
-        val topInset = homeTabs.headerBottom(toolbarBottom)
-        SideEffect(homeTabs, toolbarBottom, statusBarHeight) {
-            homeTabs.updateCollapseLimits(density, statusBarHeight, toolbarBottom)
+        val topInset = homeTabs.headerBottom(statusBarHeight, toolbarBottom)
+        SideEffect(homeTabs) {
+            homeTabs.updateCollapseLimit(density)
         }
 
         Box(
@@ -319,8 +321,9 @@ fun AndroidHomeScreenContent(
                                                 alpha = homeTabs.slideAlpha()
                                             },
                                     ) {
-                                        FeedList(
+                                        HomeFeedList(
                                             modifier = Modifier.fillMaxSize(),
+                                            isRefreshing = isRefreshing,
                                             feedItems = displayState.feedItems,
                                             revealArticleId = revealArticleId,
                                             onArticleRevealed = onArticleRevealed,
@@ -412,37 +415,23 @@ fun AndroidHomeScreenContent(
                 )
             }
 
-            HomeTabsLayer(
+            HomeHeader(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .zIndex(zIndex = 0.9f),
-                controller = homeTabs,
-                currentFeedFilter = displayState.currentFeedFilter,
-                showCounts = !displayState.isUnreadCountHidden,
+                    .zIndex(1f),
+                homeTabs = homeTabs,
+                displayState = displayState,
                 statusBarHeight = statusBarHeight,
-                toolbarBottom = toolbarBottom,
                 containerColor = contentContainerColor,
                 onFilterSelected = selectFilter,
                 onScrollToTop = scrollToTop,
-            )
-
-            HomeFloatingToolbar(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .zIndex(1f)
-                    .graphicsLayer {
-                        translationY = -headerCollapse.toolbarOffsetPx
-                        alpha = headerCollapse.toolbarAlpha
-                    },
-                displayState = displayState,
                 showDrawerMenu = showDrawerMenu,
                 isDrawerOpen = isDrawerOpen,
                 onDrawerMenuClick = onDrawerMenuClick,
                 onSearchClick = onSearchClick,
-                onMarkAllReadClicked = feedListActions.markAllRead,
-                onClearOldArticlesClicked = feedListActions.onClearOldArticlesClicked,
+                feedListActions = feedListActions,
                 onEditFeedClick = feedManagementActions.onEditFeedClick,
-                onRefreshClick = onRefresh,
+                onRefresh = onRefresh,
                 onBackupClick = onBackupClick,
                 viewMenuState = viewMenuState,
                 onFeedOrderChange = onFeedOrderChange,
@@ -592,4 +581,76 @@ private fun isFeedAtTop(
     gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
 } else {
     listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+}
+
+/** The compact tab bar when there are categories to switch between, else the floating toolbar. */
+@Composable
+private fun HomeHeader(
+    homeTabs: HomeTabsController,
+    displayState: HomeDisplayState,
+    statusBarHeight: Dp,
+    containerColor: Color,
+    onFilterSelected: (FeedFilter) -> Unit,
+    onScrollToTop: () -> Unit,
+    showDrawerMenu: Boolean,
+    isDrawerOpen: Boolean,
+    onDrawerMenuClick: () -> Unit,
+    onSearchClick: () -> Unit,
+    feedListActions: FeedListActions,
+    onEditFeedClick: (FeedSource) -> Unit,
+    onRefresh: () -> Unit,
+    onBackupClick: () -> Unit,
+    viewMenuState: HomeViewMenuState,
+    onFeedOrderChange: (FeedOrder) -> Unit,
+    onShowReadArticlesTimelineChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (!homeTabs.showTabs) {
+        HomeFloatingToolbar(
+            modifier = modifier,
+            displayState = displayState,
+            showDrawerMenu = showDrawerMenu,
+            isDrawerOpen = isDrawerOpen,
+            onDrawerMenuClick = onDrawerMenuClick,
+            onSearchClick = onSearchClick,
+            onMarkAllReadClicked = feedListActions.markAllRead,
+            onClearOldArticlesClicked = feedListActions.onClearOldArticlesClicked,
+            onEditFeedClick = onEditFeedClick,
+            onRefreshClick = onRefresh,
+            onBackupClick = onBackupClick,
+            viewMenuState = viewMenuState,
+            onFeedOrderChange = onFeedOrderChange,
+            onShowReadArticlesTimelineChange = onShowReadArticlesTimelineChange,
+        )
+        return
+    }
+    HomeTabsLayer(
+        modifier = modifier,
+        controller = homeTabs,
+        currentFeedFilter = displayState.currentFeedFilter,
+        showCounts = !displayState.isUnreadCountHidden,
+        statusBarHeight = statusBarHeight,
+        containerColor = containerColor,
+        onFilterSelected = onFilterSelected,
+        onScrollToTop = onScrollToTop,
+        navigationButton = {
+            if (showDrawerMenu) {
+                DrawerIcon(onDrawerMenuClick = onDrawerMenuClick, isDrawerOpen = isDrawerOpen)
+            }
+        },
+        actions = {
+            HomeToolbarActions(
+                displayState = displayState,
+                onSearchClick = onSearchClick,
+                onMarkAllReadClicked = feedListActions.markAllRead,
+                onClearOldArticlesClicked = feedListActions.onClearOldArticlesClicked,
+                onRefreshClick = onRefresh,
+                onEditFeedClick = onEditFeedClick,
+                onBackupClick = onBackupClick,
+                viewMenuState = viewMenuState,
+                onFeedOrderChange = onFeedOrderChange,
+                onShowReadArticlesTimelineChange = onShowReadArticlesTimelineChange,
+            )
+        },
+    )
 }

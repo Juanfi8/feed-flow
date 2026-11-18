@@ -20,7 +20,6 @@ import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.NavDrawerState
 import kotlinx.collections.immutable.ImmutableList
 
-private val tabStripGap = 4.dp
 private val tabSwitchSlideDistance = 48.dp
 private const val TAB_SWITCH_FADE = 0.6f
 
@@ -38,20 +37,15 @@ internal class HomeTabsController(
     val showTabs: Boolean get() = tabs.isNotEmpty()
     val showFeedChips: Boolean get() = tabs.getOrNull(selectedIndex)?.hasFeedChips() == true
 
-    fun tabsTop(toolbarBottom: Dp): Dp = toolbarBottom + tabStripGap
-
-    /** Where the feed list starts: below the toolbar, plus the tab strip and chips when shown. */
-    fun headerBottom(toolbarBottom: Dp): Dp = when {
-        !showTabs -> toolbarBottom
-        showFeedChips -> tabsTop(toolbarBottom) + HomeTabStripHeight + HomeFeedChipsHeight
-        else -> tabsTop(toolbarBottom) + HomeTabStripHeight
+    /** Where the feed list starts below the compact tab bar and, when shown, the feed chips. */
+    fun headerBottom(statusBarHeight: Dp, floatingToolbarBottom: Dp): Dp = when {
+        !showTabs -> floatingToolbarBottom
+        showFeedChips -> statusBarHeight + HomeTabBarHeight + HomeFeedChipsHeight
+        else -> statusBarHeight + HomeTabBarHeight
     }
 
-    fun updateCollapseLimits(density: Density, statusBarHeight: Dp, toolbarBottom: Dp) = with(density) {
-        collapse.updateLimits(
-            toolbarCollapsePx = if (showTabs) (tabsTop(toolbarBottom) - statusBarHeight).toPx() else 0f,
-            chipsCollapsePx = if (showFeedChips) HomeFeedChipsHeight.toPx() else 0f,
-        )
+    fun updateCollapseLimit(density: Density) = with(density) {
+        collapse.updateLimit(if (showFeedChips) HomeFeedChipsHeight.toPx() else 0f)
     }
 
     /** Horizontal offset of the feed list while it slides in after a tab switch. */
@@ -111,10 +105,11 @@ internal fun HomeTabsLayer(
     currentFeedFilter: FeedFilter,
     showCounts: Boolean,
     statusBarHeight: Dp,
-    toolbarBottom: Dp,
     containerColor: Color,
     onFilterSelected: (FeedFilter) -> Unit,
     onScrollToTop: () -> Unit,
+    navigationButton: @Composable () -> Unit,
+    actions: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (!controller.showTabs) return
@@ -126,8 +121,9 @@ internal fun HomeTabsLayer(
         showCounts = showCounts,
         collapseState = controller.collapse,
         statusBarHeight = statusBarHeight,
-        tabsTop = controller.tabsTop(toolbarBottom),
         containerColor = containerColor,
+        navigationButton = navigationButton,
+        actions = actions,
         onFilterSelected = onFilterSelected,
         onSelectedTabClick = {
             if (currentFeedFilter is FeedFilter.Source) {

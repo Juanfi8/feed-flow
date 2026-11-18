@@ -73,10 +73,6 @@ fun HomeFloatingToolbar(
     onShowReadArticlesTimelineChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var showMenu by remember { mutableStateOf(false) }
-    var showViewOptionsSheet by remember { mutableStateOf(false) }
-    val viewOptionsSheetState = rememberModalBottomSheetState()
-    val strings = LocalFeedFlowStrings.current
     val currentFeedFilter = displayState.currentFeedFilter
     val toolbarContainerColor = homeFloatingToolbarContainerColor()
     val toolbarBorder = homeFloatingToolbarBorder()
@@ -160,59 +156,19 @@ fun HomeFloatingToolbar(
             shadowElevation = 6.dp,
             border = toolbarBorder,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    modifier = Modifier.testTag(HomeToolbarE2eIds.SEARCH_BUTTON),
-                    onClick = onSearchClick,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = strings.searchButtonContentDescription,
-                    )
-                }
-
-                Box {
-                    IconButton(
-                        modifier = Modifier.testTag(HomeToolbarE2eIds.MORE_MENU_BUTTON),
-                        onClick = { showMenu = !showMenu },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = strings.moreOptionsButtonContentDescription,
-                        )
-                    }
-
-                    HomeAppBarDropdownMenu(
-                        showMenu = showMenu,
-                        feedFilter = currentFeedFilter,
-                        closeMenu = { showMenu = false },
-                        onRefreshClick = onRefreshClick,
-                        onMarkAllReadClicked = onMarkAllReadClicked,
-                        onClearOldArticlesClicked = onClearOldArticlesClicked,
-                        onEditFeedClick = { feedSource ->
-                            showMenu = false
-                            onEditFeedClick(feedSource)
-                        },
-                        isSyncUploadRequired = displayState.isSyncUploadRequired,
-                        onBackupClick = {
-                            showMenu = false
-                            onBackupClick()
-                        },
-                        onViewOptionsClick = { showViewOptionsSheet = true },
-                    )
-                }
-            }
+            HomeToolbarActions(
+                displayState = displayState,
+                onSearchClick = onSearchClick,
+                onMarkAllReadClicked = onMarkAllReadClicked,
+                onClearOldArticlesClicked = onClearOldArticlesClicked,
+                onRefreshClick = onRefreshClick,
+                onEditFeedClick = onEditFeedClick,
+                onBackupClick = onBackupClick,
+                viewMenuState = viewMenuState,
+                onFeedOrderChange = onFeedOrderChange,
+                onShowReadArticlesTimelineChange = onShowReadArticlesTimelineChange,
+            )
         }
-    }
-
-    if (showViewOptionsSheet) {
-        HomeViewOptionsBottomSheet(
-            state = viewMenuState,
-            onFeedOrderChange = onFeedOrderChange,
-            onShowReadArticlesTimelineChange = onShowReadArticlesTimelineChange,
-            onDismiss = { showViewOptionsSheet = false },
-            sheetState = viewOptionsSheetState,
-        )
     }
 }
 
@@ -249,7 +205,7 @@ private fun FeedFilter.getTitle(): String =
     }
 
 @Composable
-private fun DrawerIcon(onDrawerMenuClick: () -> Unit, isDrawerOpen: Boolean) {
+internal fun DrawerIcon(onDrawerMenuClick: () -> Unit, isDrawerOpen: Boolean) {
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     IconButton(
         modifier = Modifier.testTag(DrawerE2eIds.MENU_BUTTON),
@@ -265,6 +221,82 @@ private fun DrawerIcon(onDrawerMenuClick: () -> Unit, isDrawerOpen: Boolean) {
             imageVector = icon,
             contentDescription = LocalFeedFlowStrings.current.drawerMenuButtonContentDescription,
             tint = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+/** Search and the overflow menu (with its view options sheet), shared by both home headers. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun HomeToolbarActions(
+    displayState: HomeDisplayState,
+    onSearchClick: () -> Unit,
+    onMarkAllReadClicked: () -> Unit,
+    onClearOldArticlesClicked: () -> Unit,
+    onRefreshClick: () -> Unit,
+    onEditFeedClick: (FeedSource) -> Unit,
+    onBackupClick: () -> Unit,
+    viewMenuState: HomeViewMenuState,
+    onFeedOrderChange: (FeedOrder) -> Unit,
+    onShowReadArticlesTimelineChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var showMenu by remember { mutableStateOf(false) }
+    var showViewOptionsSheet by remember { mutableStateOf(false) }
+    val viewOptionsSheetState = rememberModalBottomSheetState()
+    val strings = LocalFeedFlowStrings.current
+    val currentFeedFilter = displayState.currentFeedFilter
+
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        IconButton(
+            modifier = Modifier.testTag(HomeToolbarE2eIds.SEARCH_BUTTON),
+            onClick = onSearchClick,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = strings.searchButtonContentDescription,
+            )
+        }
+
+        Box {
+            IconButton(
+                modifier = Modifier.testTag(HomeToolbarE2eIds.MORE_MENU_BUTTON),
+                onClick = { showMenu = !showMenu },
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = strings.moreOptionsButtonContentDescription,
+                )
+            }
+
+            HomeAppBarDropdownMenu(
+                showMenu = showMenu,
+                feedFilter = currentFeedFilter,
+                closeMenu = { showMenu = false },
+                onRefreshClick = onRefreshClick,
+                onMarkAllReadClicked = onMarkAllReadClicked,
+                onClearOldArticlesClicked = onClearOldArticlesClicked,
+                onEditFeedClick = { feedSource ->
+                    showMenu = false
+                    onEditFeedClick(feedSource)
+                },
+                isSyncUploadRequired = displayState.isSyncUploadRequired,
+                onBackupClick = {
+                    showMenu = false
+                    onBackupClick()
+                },
+                onViewOptionsClick = { showViewOptionsSheet = true },
+            )
+        }
+    }
+
+    if (showViewOptionsSheet) {
+        HomeViewOptionsBottomSheet(
+            state = viewMenuState,
+            onFeedOrderChange = onFeedOrderChange,
+            onShowReadArticlesTimelineChange = onShowReadArticlesTimelineChange,
+            onDismiss = { showViewOptionsSheet = false },
+            sheetState = viewOptionsSheetState,
         )
     }
 }

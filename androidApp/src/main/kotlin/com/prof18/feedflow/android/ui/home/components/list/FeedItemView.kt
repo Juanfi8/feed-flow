@@ -1,5 +1,6 @@
 package com.prof18.feedflow.android.ui.home.components.list
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -83,37 +84,7 @@ internal fun FeedItemView(
     } else {
         Modifier.singleAndLongClickModifier(
             onClick = {
-                val redirectSettings = ArticleRedirectSettings(context)
-                val redirectEnabled = redirectSettings.redirectsOrdinaryTaps(feedItem.feedSource.id)
-                val prefix = if (redirectEnabled) {
-                    redirectSettings.prefixForFeed(feedItem.feedSource.id)
-                } else {
-                    null
-                }
-                if (redirectEnabled && prefix == null && feedItem.url.isNotBlank()) {
-                    Toast.makeText(context, R.string.redirect_missing, Toast.LENGTH_LONG).show()
-                } else {
-                    onFeedItemClick(
-                        FeedItemUrlInfo(
-                            id = feedItem.id,
-                            url = if (prefix != null && feedItem.url.isNotBlank()) {
-                                prefix + feedItem.url
-                            } else {
-                                feedItem.url
-                            },
-                            title = feedItem.title,
-                            isBookmarked = feedItem.isBookmarked,
-                            articleOpenMode = if (prefix != null && feedItem.url.isNotBlank()) {
-                                ArticleOpenMode.PREFERRED_BROWSER
-                            } else {
-                                feedItem.feedSource.articleOpenMode
-                            },
-                            commentsUrl = feedItem.commentsUrl,
-                            imageUrl = feedItem.imageUrl,
-                            feedSourceTitle = feedItem.feedSource.title,
-                        ),
-                    )
-                }
+                feedItem.toClickUrlInfo(context)?.let(onFeedItemClick)
             },
             onLongClick = {
                 showItemMenu = true
@@ -273,4 +244,29 @@ internal fun FeedItemListViewPreview() {
             onMarkAllBelowAsRead = {},
         )
     }
+}
+
+/**
+ * What tapping an article opens, with the per-feed redirect applied. Returns null, after telling
+ * the reader why, when the feed redirects taps but no redirect URL is set yet.
+ */
+internal fun FeedItem.toClickUrlInfo(context: Context): FeedItemUrlInfo? {
+    val redirectSettings = ArticleRedirectSettings(context)
+    val redirectEnabled = redirectSettings.redirectsOrdinaryTaps(feedSource.id)
+    val prefix = if (redirectEnabled) redirectSettings.prefixForFeed(feedSource.id) else null
+    if (redirectEnabled && prefix == null && url.isNotBlank()) {
+        Toast.makeText(context, R.string.redirect_missing, Toast.LENGTH_LONG).show()
+        return null
+    }
+    val redirected = prefix != null && url.isNotBlank()
+    return FeedItemUrlInfo(
+        id = id,
+        url = if (redirected) prefix + url else url,
+        title = title,
+        isBookmarked = isBookmarked,
+        articleOpenMode = if (redirected) ArticleOpenMode.PREFERRED_BROWSER else feedSource.articleOpenMode,
+        commentsUrl = commentsUrl,
+        imageUrl = imageUrl,
+        feedSourceTitle = feedSource.title,
+    )
 }
