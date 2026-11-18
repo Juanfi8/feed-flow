@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -17,10 +16,16 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.prof18.feedflow.android.ui.home.components.magazine.MagazineStoryActions
 import com.prof18.feedflow.android.ui.home.components.magazine.rememberReadGrouping
 import com.prof18.feedflow.android.ui.utils.LocalReduceMotion
@@ -29,17 +34,18 @@ import com.prof18.feedflow.core.model.FeedItem
 import kotlinx.collections.immutable.ImmutableList
 import kotlin.math.absoluteValue
 
-// How much a page shrinks and darkens as the next one slides over it.
-private const val DEPTH_SCALE = 0.08f
-private const val DEPTH_DIM = 0.45f
-private val DepthCorner = 24.dp
+// Fold geometry: half a turn per page, the leaf upright at the halfway point.
+private const val FULL_TURN = 180f
+private const val HALF = 0.5f
+private const val FOLD_MAX_SHADE = 0.4f
+private const val FOLD_CAMERA_DISTANCE = 18f
 
 // Ask for more stories this many pages before the end.
 private const val PAGINATION_PAGES_LEFT = 3
 
 /**
- * The Flip style: one page at a time, flipped vertically. The page being left stays put, sinks
- * back and dims while the next one slides up over it (and the reverse when flipping back).
+ * The Flip style: one page at a time, turned vertically with a fold across the middle of the
+ * page that follows the finger.
  */
 @Composable
 internal fun FlipFeedPager(
@@ -78,10 +84,17 @@ internal fun FlipFeedPager(
         beyondViewportPageCount = 1,
     ) { index ->
         val page = pages.getOrNull(index) ?: return@VerticalPager
+        val topHalf = rememberGraphicsLayer()
+        val bottomHalf = rememberGraphicsLayer()
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (reduceMotion) Modifier else Modifier.depthTransition(pagerState, index)),
+                // The page being folded over is drawn above the one revealed underneath; the pager's
+                // current page flips at the halfway point, exactly when the leaf passes upright.
+                .zIndex(if (index == pagerState.currentPage) 1f else 0f)
+                .then(
+                    if (reduceMotion) Modifier else Modifier.foldTransition(pagerState, index, topHalf, bottomHalf),
+                ),
         ) {
             FlipPageView(
                 page = page,
@@ -96,35 +109,73 @@ internal fun FlipFeedPager(
 }
 
 /**
- * Depth transition. A page with a positive offset is the one being covered: it is held in place
- * (cancelling the pager's own movement), scaled down, rounded and dimmed. The incoming page has
- * the higher index, so the pager already draws it above.
+ * Fold transition: pages turn like a sheet hinged across the middle. Both pages of a turn are held
+ * in place (cancelling the pager's own slide). In the first half, the earlier page's lower half
+ * lifts toward the reader over the next page's lower half; in the second half, the next page's
+ * upper half comes down over the earlier page's upper half. Shading follows the leaf's angle.
  */
-private fun Modifier.depthTransition(pagerState: PagerState, index: Int): Modifier =
-    this
-        .graphicsLayer {
-            val offset = (pagerState.currentPage - index) + pagerState.currentPageOffsetFraction
-            if (offset > 0f) {
-                val progress = offset.coerceIn(0f, 1f)
-                translationY = progress * size.height
-                val scale = 1f - DEPTH_SCALE * progress
-                scaleX = scale
-                scaleY = scale
-                shape = RoundedCornerShape(DepthCorner * progress)
-                clip = true
-            } else {
-                val progress = offset.absoluteValue.coerceIn(0f, 1f)
-                shape = RoundedCornerShape(DepthCorner * progress)
-                clip = progress > 0f
-            }
-        }
-        .drawWithContent {
+private fun Modifier.foldTransition(
+    pagerState: PagerState,
+    index: Int,
+    topHalf: GraphicsLayer,
+    bottomHalf: GraphicsLayer,
+): Modifier = this
+    .graphicsLayer {
+        val offset = pagerState.offsetOf(index)
+        translationY = offset * size.height
+        alpha = if (offset.absoluteValue >= 1f) 0f else 1f
+    }
+    .drawWithContent {
+        val offset = pagerState.offsetOf(index)
+        if (offset == 0f || offset.absoluteValue >= 1f) {
             drawContent()
-            val offset = (pagerState.currentPage - index) + pagerState.currentPageOffsetFraction
-            if (offset > 0f) {
-                drawRect(Color.Black, alpha = DEPTH_DIM * offset.coerceIn(0f, 1f))
+            return@drawWithContent
+        }
+        val middle = size.height / 2f
+        val isEarlierPage = offset > 0f
+        // 0 shows the earlier page, 1 the later one.
+        val progress = if (isEarlierPage) offset else 1f + offset
+
+        fun ContentDrawScope.staticHalf(top: Boolean, shade: Float) {
+            clipRect(top = if (top) 0f else middle, bottom = if (top) middle else size.height) {
+                this@staticHalf.drawContent()
+                if (shade > 0f) drawRect(Color.Black, alpha = shade)
             }
         }
+
+        fun ContentDrawScope.leaf(layer: GraphicsLayer, top: Boolean, angle: Float, shade: Float) {
+            layer.record {
+                clipRect(top = if (top) 0f else middle, bottom = if (top) middle else size.height) {
+                    this@leaf.drawContent()
+                    drawRect(Color.Black, alpha = shade)
+                }
+            }
+            layer.pivotOffset = Offset(size.width / 2f, middle)
+            layer.cameraDistance = FOLD_CAMERA_DISTANCE
+            layer.rotationX = angle
+            drawLayer(layer)
+        }
+
+        if (isEarlierPage) {
+            staticHalf(top = true, shade = FOLD_MAX_SHADE * ((progress - HALF) / HALF).coerceAtLeast(0f))
+            if (progress < HALF) {
+                leaf(bottomHalf, top = false, angle = FULL_TURN * progress, shade = FOLD_MAX_SHADE * progress / HALF)
+            }
+        } else {
+            staticHalf(top = false, shade = FOLD_MAX_SHADE * (1f - progress))
+            if (progress > HALF) {
+                leaf(
+                    topHalf,
+                    top = true,
+                    angle = FULL_TURN * progress - FULL_TURN,
+                    shade = FOLD_MAX_SHADE * (1f - progress) / HALF,
+                )
+            }
+        }
+    }
+
+/** Distance of [index] from the settled position: positive above it, negative below. */
+private fun PagerState.offsetOf(index: Int): Float = (currentPage - index) + currentPageOffsetFraction
 
 /** Pages flipped past, in either order, have their stories marked read (once each). */
 @Composable

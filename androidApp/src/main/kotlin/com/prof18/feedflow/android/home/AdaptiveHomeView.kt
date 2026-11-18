@@ -196,14 +196,14 @@ fun AdaptiveHomeView(
             }
         }
 
-        // Swiping the list steps through the category tabs. From the first tab, the swipe toward
-        // the drawer keeps opening it, as it did before tabs existed.
+        // Swiping the list steps through the category tabs. With tabs, the swipe stops at All feeds
+        // instead of opening the drawer (the drawer button still does); without categories it
+        // keeps opening the drawer, as before tabs existed.
         val onSwipeTowardDrawer by rememberUpdatedState {
             val previous = homeTabs.stepFrom(selectedTabIndex, forward = false)
-            if (previous != null) {
-                openTab(previous)
-            } else {
-                scope.launch { drawerState.open() }
+            when {
+                previous != null -> openTab(previous)
+                homeTabs.isEmpty() -> scope.launch { drawerState.open() }
             }
         }
         val onSwipeAwayFromDrawer by rememberUpdatedState {

@@ -2,7 +2,9 @@ package com.prof18.feedflow.android
 
 import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import org.json.JSONArray
+import org.koin.core.context.GlobalContext
 
 /** Android-only settings for explicit article redirect actions. */
 internal class ArticleRedirectSettings(context: Context) {
@@ -46,4 +48,18 @@ internal class ArticleRedirectSettings(context: Context) {
 internal fun isValidRedirectPrefix(prefix: String): Boolean {
     val uri = runCatching { Uri.parse(prefix) }.getOrNull() ?: return false
     return uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank() && !prefix.any(Char::isWhitespace)
+}
+
+/**
+ * Opens [url] through the feed's redirect (its own or the default one) in the browser. Without a
+ * redirect set, tells the reader where to add one instead.
+ */
+internal fun openArticleWithRedirect(feedSourceId: String, url: String, context: Context) {
+    val prefix = ArticleRedirectSettings(context).prefixForFeed(feedSourceId)
+    if (prefix == null) {
+        Toast.makeText(context, R.string.redirect_missing, Toast.LENGTH_LONG).show()
+    } else {
+        GlobalContext.get().get<BrowserManager>()
+            .openArticleInBrowser(prefix + url, context, preferAppHandler = false)
+    }
 }

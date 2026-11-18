@@ -1,7 +1,9 @@
 package com.prof18.feedflow.android.home.tabs
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -10,7 +12,9 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
@@ -20,9 +24,14 @@ import com.prof18.feedflow.android.ui.home.components.flip.NextCategory
 import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.NavDrawerState
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
-private val tabSwitchSlideDistance = 48.dp
-private const val TAB_SWITCH_FADE = 0.6f
+private val tabSwitchSlideDistance = 72.dp
+private const val TAB_SWITCH_OUT_MILLIS = 120
+
+// How long the new tab's stories may take to arrive before the list slides in anyway.
+private const val TAB_SWITCH_WAIT_MILLIS = 400L
 
 /**
  * Everything the home screen needs from the category tabs: which tabs exist, which one is open,
@@ -56,7 +65,7 @@ internal class HomeTabsController(
         slide.value * (if (isRtl) -1f else 1f) * tabSwitchSlideDistance.toPx()
     }
 
-    fun slideAlpha(): Float = 1f - kotlin.math.abs(slide.value) * TAB_SWITCH_FADE
+    fun slideAlpha(): Float = 1f - kotlin.math.abs(slide.value).coerceAtMost(1f)
 }
 
 @Composable
@@ -65,6 +74,7 @@ internal fun rememberHomeTabsController(
     currentFeedFilter: FeedFilter,
     reduceMotionEnabled: Boolean,
     isListAtTop: () -> Boolean,
+    feedItems: Any? = null,
     isPaged: Boolean = false,
 ): HomeTabsController {
     val tabs = remember(navDrawerState) { buildHomeTabs(navDrawerState) }
@@ -73,16 +83,27 @@ internal fun rememberHomeTabsController(
     val slide = remember { Animatable(0f) }
     var previousIndex by remember { mutableIntStateOf(selectedIndex) }
 
-    // Slide the list in from the side of the newly opened tab, so switching reads as moving along
-    // the strip.
+    val latestFeedItems by rememberUpdatedState(feedItems)
+
+    // Switching tabs reads as moving along the strip: the old stories slide out and fade toward the
+    // tab being left, and the new ones slide in from the side of the tab being opened once they
+    // have loaded, so the old list never slides back in.
     LaunchedEffect(selectedIndex) {
         val from = previousIndex
         previousIndex = selectedIndex
         if (reduceMotionEnabled || from < 0 || selectedIndex < 0 || from == selectedIndex) {
             return@LaunchedEffect
         }
-        slide.snapTo(if (selectedIndex > from) 1f else -1f)
-        slide.animateTo(0f, tween(durationMillis = 250, easing = FastOutSlowInEasing))
+        val direction = if (selectedIndex > from) 1f else -1f
+        val itemsBefore = latestFeedItems
+        slide.animateTo(-direction, tween(durationMillis = TAB_SWITCH_OUT_MILLIS, easing = FastOutLinearInEasing))
+        if (latestFeedItems === itemsBefore) {
+            withTimeoutOrNull(TAB_SWITCH_WAIT_MILLIS) {
+                snapshotFlow { latestFeedItems }.first { it !== itemsBefore }
+            }
+        }
+        slide.snapTo(direction)
+        slide.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
     }
 
     // A list that reaches its top (scroll-to-top, new filter) shows the whole header again.

@@ -21,7 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.FilledTonalButton
@@ -31,13 +31,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
@@ -47,8 +44,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.prof18.feedflow.android.R
+import com.prof18.feedflow.android.openArticleWithRedirect
 import com.prof18.feedflow.android.ui.home.components.FeedItemHeroImage
-import com.prof18.feedflow.android.ui.home.components.list.FeedItemContextMenu
 import com.prof18.feedflow.android.ui.home.components.list.imageAlpha
 import com.prof18.feedflow.android.ui.home.components.list.imageColorFilter
 import com.prof18.feedflow.android.ui.home.components.list.textColor
@@ -303,7 +300,7 @@ private fun FlipBottomBar(
             if (coverItem != null) {
                 SourceChip(coverItem, actions)
                 Spacer(modifier = Modifier.weight(1f))
-                StoryActions(coverItem, actions, showMore = true)
+                StoryActions(coverItem, actions)
             } else {
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
@@ -372,10 +369,11 @@ private fun SourceChip(item: FeedItem, actions: MagazineStoryActions) {
     }
 }
 
+/** Save, share and open with the feed's redirect: the same three on every story. */
 @Composable
-private fun StoryActions(item: FeedItem, actions: MagazineStoryActions, showMore: Boolean = false) {
-    var showMenu by remember { mutableStateOf(false) }
+private fun StoryActions(item: FeedItem, actions: MagazineStoryActions) {
     val strings = LocalFeedFlowStrings.current
+    val context = LocalContext.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = { actions.onBookmarkClick(FeedItemId(item.id), !item.isBookmarked) }) {
             Icon(
@@ -399,29 +397,12 @@ private fun StoryActions(item: FeedItem, actions: MagazineStoryActions, showMore
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (showMore) {
-            Box {
-                IconButton(onClick = { showMenu = true }) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = strings.moreOptionsButtonContentDescription,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                FeedItemContextMenu(
-                    showMenu = showMenu,
-                    closeMenu = { showMenu = false },
-                    feedItem = item,
-                    shareMenuLabel = actions.shareMenuLabel,
-                    shareCommentsMenuLabel = actions.shareCommentsMenuLabel,
-                    onBookmarkClick = actions.onBookmarkClick,
-                    onReadStatusClick = actions.onReadStatusClick,
-                    onCommentClick = actions.onCommentClick,
-                    onShareClick = actions.onShareClick,
-                    onOpenFeedSettings = actions.onOpenFeedSettings,
-                    onOpenFeedWebsite = actions.onOpenFeedWebsite,
-                    onMarkAllAboveAsRead = actions.onMarkAllAboveAsRead,
-                    onMarkAllBelowAsRead = actions.onMarkAllBelowAsRead,
+        if (item.url.isNotBlank()) {
+            IconButton(onClick = { openArticleWithRedirect(item.feedSource.id, item.url, context) }) {
+                Icon(
+                    imageVector = Icons.Default.Public,
+                    contentDescription = stringResource(R.string.redirect_open),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

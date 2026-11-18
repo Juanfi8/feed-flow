@@ -166,6 +166,7 @@ fun AndroidHomeScreenContent(
         currentFeedFilter = displayState.currentFeedFilter,
         reduceMotionEnabled = reduceMotionEnabled,
         isListAtTop = { isListAtTop },
+        feedItems = displayState.feedItems,
         isPaged = rememberFeedStyle(displayState.feedLayout).isPaged,
     )
     val flipTabContext = homeTabs.flipTabContext(onFilterSelected = selectFilter)
