@@ -209,6 +209,7 @@ internal fun HomeScreen(
             markAllBelowAsRead = { feedItemId -> homeViewModel.markAllBelowAsRead(feedItemId) },
             onShowNewArticlesClick = homeViewModel::onShowNewArticlesClicked,
             onScrolledAwayFromTopChanged = homeViewModel::onFeedListScrolledAwayFromTopChanged,
+            onFeedItemsPagedPast = homeViewModel::onFeedItemsPagedPast,
         )
     }
 

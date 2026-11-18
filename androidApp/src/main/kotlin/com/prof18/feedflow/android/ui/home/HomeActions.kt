@@ -32,6 +32,7 @@ data class FeedListActions(
     val onNavigateNext: () -> Unit = {},
     val onShowNewArticlesClick: () -> Unit = {},
     val onScrolledAwayFromTopChanged: (Boolean) -> Unit = {},
+    val onFeedItemsPagedPast: (Collection<String>) -> Unit = {},
 )
 
 @Stable

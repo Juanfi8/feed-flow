@@ -100,6 +100,7 @@ internal data class MagazineStoryActions(
     val onOpenFeedWebsite: (String) -> Unit,
     val onMarkAllAboveAsRead: (String) -> Unit,
     val onMarkAllBelowAsRead: (String) -> Unit,
+    val onSourceClick: (FeedSource) -> Unit = {},
     /** False for previews: no taps, no long-press menu. */
     val isInteractive: Boolean = true,
 )
@@ -436,7 +437,7 @@ internal fun MagazineShowMoreRead(remaining: Int, onClick: () -> Unit, modifier:
 
 /** Tap opens the story (with the feed's redirect), long-press opens the usual article menu. */
 @Composable
-private fun StoryContainer(
+internal fun StoryContainer(
     item: FeedItem,
     actions: MagazineStoryActions,
     modifier: Modifier = Modifier,
@@ -479,7 +480,7 @@ private fun StoryContainer(
 }
 
 @Composable
-private fun SourceLine(item: FeedItem, actions: MagazineStoryActions) {
+internal fun SourceLine(item: FeedItem, actions: MagazineStoryActions) {
     val showSource = !actions.displaySettings.isHideFeedSourceEnabled
     val showDot = !item.isRead && !actions.displaySettings.isHideUnreadDotEnabled
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -518,7 +519,7 @@ private fun SourceLine(item: FeedItem, actions: MagazineStoryActions) {
 }
 
 @Composable
-private fun SourceLogo(item: FeedItem) {
+internal fun SourceLogo(item: FeedItem) {
     val logoUrl = item.feedSource.logoUrl
     if (logoUrl != null) {
         FeedSourceLogoImage(imageUrl = logoUrl, size = 16.dp, cornerRadius = 4.dp)

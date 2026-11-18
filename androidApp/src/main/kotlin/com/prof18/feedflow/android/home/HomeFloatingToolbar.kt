@@ -55,6 +55,7 @@ import com.prof18.feedflow.core.model.FeedSource
 import com.prof18.feedflow.shared.presentation.FeedListSettingsViewModel
 import com.prof18.feedflow.shared.presentation.model.HomeDisplayState
 import com.prof18.feedflow.shared.presentation.model.HomeViewMenuState
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -249,6 +250,8 @@ internal fun HomeToolbarActions(
     val strings = LocalFeedFlowStrings.current
     val currentFeedFilter = displayState.currentFeedFilter
     val feedListSettingsViewModel = koinViewModel<FeedListSettingsViewModel>()
+    val feedStyleSettings = koinInject<FeedStyleSettings>()
+    val feedStyle = rememberFeedStyle(displayState.feedLayout)
 
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         IconButton(
@@ -289,8 +292,11 @@ internal fun HomeToolbarActions(
                     onBackupClick()
                 },
                 onViewOptionsClick = { showViewOptionsSheet = true },
-                feedLayout = displayState.feedLayout,
-                onFeedLayoutSelected = feedListSettingsViewModel::updateFeedLayout,
+                feedStyle = feedStyle,
+                onFeedStyleSelected = { style ->
+                    feedStyleSettings.select(style)
+                    feedListSettingsViewModel.updateFeedLayout(style.layout)
+                },
             )
         }
     }

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.ViewAgenda
+import androidx.compose.material.icons.outlined.ViewCarousel
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -34,7 +35,6 @@ import com.prof18.feedflow.android.R
 import com.prof18.feedflow.android.ui.style.Spacing
 import com.prof18.feedflow.android.ui.utils.LocalFeedFlowStrings
 import com.prof18.feedflow.core.model.FeedFilter
-import com.prof18.feedflow.core.model.FeedLayout
 import com.prof18.feedflow.core.model.FeedSource
 
 @Composable
@@ -50,8 +50,8 @@ fun HomeAppBarDropdownMenu(
     onBackupClick: () -> Unit,
     onViewOptionsClick: () -> Unit,
     modifier: Modifier = Modifier,
-    feedLayout: FeedLayout? = null,
-    onFeedLayoutSelected: (FeedLayout) -> Unit = {},
+    feedStyle: FeedStyle? = null,
+    onFeedStyleSelected: (FeedStyle) -> Unit = {},
 ) {
     var showMarkAllReadDialog by remember(feedFilter) { mutableStateOf(false) }
     var showClearOldArticlesDialog by remember { mutableStateOf(false) }
@@ -197,22 +197,22 @@ fun HomeAppBarDropdownMenu(
             },
         )
 
-        if (feedLayout != null) {
-            val nextStyle = feedLayout.nextFeedStyle()
+        if (feedStyle != null) {
+            val nextStyle = feedStyle.nextFeedStyle()
             DropdownMenuItem(
                 onClick = {
                     closeMenu()
-                    onFeedLayoutSelected(nextStyle)
+                    onFeedStyleSelected(nextStyle)
                 },
                 text = {
                     Text(stringResource(R.string.feed_style_switch_to, stringResource(nextStyle.styleNameRes())))
                 },
                 leadingIcon = {
                     Icon(
-                        imageVector = if (nextStyle == FeedLayout.BIG_IMAGE) {
-                            Icons.Outlined.Dashboard
-                        } else {
-                            Icons.Outlined.ViewAgenda
+                        imageVector = when (nextStyle) {
+                            FeedStyle.MAGAZINE -> Icons.Outlined.Dashboard
+                            FeedStyle.FLIP -> Icons.Outlined.ViewCarousel
+                            FeedStyle.LIST, FeedStyle.CARD -> Icons.Outlined.ViewAgenda
                         },
                         contentDescription = null,
                     )

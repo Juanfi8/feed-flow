@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.prof18.feedflow.android.R
+import com.prof18.feedflow.android.home.FeedStyle
 import com.prof18.feedflow.android.settings.SettingsE2eIds
 import com.prof18.feedflow.android.ui.readermode.SliderWithPlusMinus
 import com.prof18.feedflow.android.ui.readermode.wholeValueSteps
@@ -50,7 +51,8 @@ internal fun FeedListSettingsScreenContent(
     fontSizes: FeedFontSizes,
     state: FeedListSettingsState,
     updateFontScale: (Int) -> Unit,
-    setFeedLayout: (FeedLayout) -> Unit,
+    feedStyle: FeedStyle,
+    onFeedStyleSelected: (FeedStyle) -> Unit,
     setGridLayoutEnabled: (Boolean) -> Unit,
     setHideDescription: (Boolean) -> Unit,
     setHideImages: (Boolean) -> Unit,
@@ -108,7 +110,7 @@ internal fun FeedListSettingsScreenContent(
 
             // Magazine has no per-article swipe actions and shows times under day headings,
             // so the swipe and date format settings only apply to List and Card.
-            val isMagazine = state.feedLayout == FeedLayout.BIG_IMAGE
+            val isMagazine = feedStyle.isEditorial
             LazyColumn {
                 item {
                     Text(
@@ -133,13 +135,14 @@ internal fun FeedListSettingsScreenContent(
                     CompactSettingDropdownRow(
                         modifier = Modifier.testTag(SettingsE2eIds.FEED_LIST_LAYOUT),
                         title = strings.feedLayoutTitle,
-                        currentValue = state.feedLayout,
+                        currentValue = feedStyle,
                         options = persistentListOf(
-                            SettingDropdownOption(FeedLayout.LIST, strings.settingsFeedLayoutList),
-                            SettingDropdownOption(FeedLayout.CARD, strings.settingsFeedLayoutCard),
-                            SettingDropdownOption(FeedLayout.BIG_IMAGE, stringResource(R.string.feed_style_magazine)),
+                            SettingDropdownOption(FeedStyle.LIST, strings.settingsFeedLayoutList),
+                            SettingDropdownOption(FeedStyle.CARD, strings.settingsFeedLayoutCard),
+                            SettingDropdownOption(FeedStyle.MAGAZINE, stringResource(R.string.feed_style_magazine)),
+                            SettingDropdownOption(FeedStyle.FLIP, stringResource(R.string.feed_style_flip)),
                         ),
-                        onOptionSelected = setFeedLayout,
+                        onOptionSelected = onFeedStyleSelected,
                     )
                 }
 
@@ -147,7 +150,7 @@ internal fun FeedListSettingsScreenContent(
                     item {
                         Text(
                             modifier = Modifier.padding(horizontal = Spacing.regular, vertical = Spacing.small),
-                            text = stringResource(R.string.feed_style_magazine_hint),
+                            text = stringResource(feedStyle.hintRes()),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -370,7 +373,8 @@ private fun FeedListSettingsScreenContentPreview() {
                 feedOrder = FeedOrder.NEWEST_FIRST,
             ),
             updateFontScale = {},
-            setFeedLayout = {},
+            feedStyle = FeedStyle.LIST,
+            onFeedStyleSelected = {},
             setGridLayoutEnabled = {},
             setHideDescription = {},
             setHideImages = {},
@@ -388,3 +392,5 @@ private fun FeedListSettingsScreenContentPreview() {
 }
 
 private val FONT_SCALE_RANGE = -4f..16f
+
+private fun FeedStyle.hintRes(): Int = if (isPaged) R.string.feed_style_flip_hint else R.string.feed_style_magazine_hint

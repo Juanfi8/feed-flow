@@ -3,6 +3,15 @@
     <string name="feed_style_list">List</string>
     <string name="feed_style_card">Card</string>
     <string name="feed_style_magazine">Magazine</string>
+    <string name="feed_style_flip">Flip</string>
     <string name="feed_style_switch_to">Switch to %1$s style</string>
     <string name="feed_style_magazine_hint">Magazine groups articles by day and folds read ones away. Swipe the feed left or right to change category; article swipe actions apply to List and Card.</string>
+    <string name="feed_style_flip_hint">Flip shows one page at a time. Swipe up for the next page, left or right to change category. Pages you flip past count as read when marking while scrolling is on.</string>
+    <string name="flip_quick_reads">Quick reads</string>
+    <string name="flip_caught_up">You\'re caught up</string>
+    <string name="flip_caught_up_in">You\'re caught up on %1$s</string>
+    <string name="flip_read_folded">%1$d read, folded away</string>
+    <string name="flip_next_category">Flip to %1$s</string>
+    <string name="flip_page_of">%1$d of %2$d</string>
+    <string name="flip_open_feed">Show only %1$s</string>
 </resources>

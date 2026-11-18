@@ -294,7 +294,7 @@ private fun FeedChip(
 
 @Composable
 @ReadOnlyComposable
-private fun HomeTab.label(): String = when {
+internal fun HomeTab.label(): String = when {
     title != null -> title
     filter is FeedFilter.Timeline -> stringResource(R.string.home_tabs_all_feeds)
     else -> LocalFeedFlowStrings.current.noCategory

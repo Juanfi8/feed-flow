@@ -3,7 +3,10 @@ package com.prof18.feedflow.android.settings.feedlist
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.prof18.feedflow.android.home.FeedStyle
+import com.prof18.feedflow.android.home.FeedStyleSettings
 import com.prof18.feedflow.shared.presentation.FeedListSettingsViewModel
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -13,13 +16,19 @@ fun FeedListSettingsScreen(
     val viewModel = koinViewModel<FeedListSettingsViewModel>()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val fontSizesState by viewModel.feedFontSizeState.collectAsStateWithLifecycle()
+    val feedStyleSettings = koinInject<FeedStyleSettings>()
+    val isFlipEnabled by feedStyleSettings.isFlipEnabled.collectAsStateWithLifecycle()
 
     FeedListSettingsScreenContent(
         navigateBack = navigateBack,
         fontSizes = fontSizesState,
         state = state,
         updateFontScale = viewModel::updateFontScale,
-        setFeedLayout = viewModel::updateFeedLayout,
+        feedStyle = FeedStyle.of(state.feedLayout, isFlipEnabled),
+        onFeedStyleSelected = { style ->
+            feedStyleSettings.select(style)
+            viewModel.updateFeedLayout(style.layout)
+        },
         setGridLayoutEnabled = viewModel::updateGridLayoutEnabled,
         setHideDescription = viewModel::updateHideDescription,
         setHideImages = viewModel::updateHideImages,

@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.prof18.feedflow.android.home.tabs.HomeTabsController
 import com.prof18.feedflow.android.home.tabs.HomeTabsLayer
+import com.prof18.feedflow.android.home.tabs.flipTabContext
 import com.prof18.feedflow.android.home.tabs.rememberHomeTabsController
 import com.prof18.feedflow.android.ui.components.ConfirmationDialog
 import com.prof18.feedflow.android.ui.home.FeedListActions
@@ -165,7 +166,9 @@ fun AndroidHomeScreenContent(
         currentFeedFilter = displayState.currentFeedFilter,
         reduceMotionEnabled = reduceMotionEnabled,
         isListAtTop = { isListAtTop },
+        isPaged = rememberFeedStyle(displayState.feedLayout).isPaged,
     )
+    val flipTabContext = homeTabs.flipTabContext(onFilterSelected = selectFilter)
     val headerCollapse = homeTabs.collapse
 
     LaunchedEffect(isShowingEmptyFeed, hasFeedItems) {
@@ -324,6 +327,9 @@ fun AndroidHomeScreenContent(
                                         HomeFeedList(
                                             modifier = Modifier.fillMaxSize(),
                                             isRefreshing = isRefreshing,
+                                            onItemsPagedPast = feedListActions.onFeedItemsPagedPast,
+                                            onSourceClick = { source -> selectFilter(FeedFilter.Source(source)) },
+                                            flipTabContext = flipTabContext,
                                             feedItems = displayState.feedItems,
                                             revealArticleId = revealArticleId,
                                             onArticleRevealed = onArticleRevealed,

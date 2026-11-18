@@ -352,6 +352,25 @@ class HomeViewModel internal constructor(
         enqueueScrollReadIds(idsToMark)
     }
 
+    /**
+     * Marks stories the reader paged past, for layouts that show stories a page at a time instead
+     * of in feed order. Follows the scrolling rules: only while marking on scroll is on, and never
+     * for feeds kept unread on scroll.
+     */
+    fun onFeedItemsPagedPast(feedItemIds: Collection<String>) {
+        if (!settingsRepository.markFeedAsReadWhenScrollingFlow.value) {
+            return
+        }
+        val excludedFeedSourceIds = keepUnreadOnScrollFeedSourceIds.value
+        val idsToMark = feedState.value
+            .filter { it.id in feedItemIds && !it.isRead && it.feedSource.id !in excludedFeedSourceIds }
+            .map { FeedItemId(it.id) }
+            .toSet()
+        if (idsToMark.isNotEmpty()) {
+            enqueueScrollReadIds(idsToMark)
+        }
+    }
+
     fun requestNewFeedsPage() {
         viewModelScope.launch {
             feedStateRepository.loadMoreFeeds()

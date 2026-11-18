@@ -9,6 +9,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import com.prof18.feedflow.android.home.FeedStyle
+import com.prof18.feedflow.android.home.rememberFeedStyle
+import com.prof18.feedflow.android.home.tabs.FlipTabContext
+import com.prof18.feedflow.android.ui.home.components.flip.FlipFeedPager
 import com.prof18.feedflow.android.ui.home.components.list.FeedList
 import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.FeedFontSizes
@@ -24,7 +28,7 @@ import com.prof18.feedflow.core.model.VisibleFeedItem
 import com.prof18.feedflow.shared.presentation.model.NextFeedDisplayState
 import kotlinx.collections.immutable.ImmutableList
 
-/** The home feed: the magazine for the "Big image" layout, the regular list for the others. */
+/** The home feed: Magazine or Flip for the "Big image" layout, the regular list for the others. */
 @Suppress("LongParameterList")
 @Composable
 internal fun HomeFeedList(
@@ -59,48 +63,18 @@ internal fun HomeFeedList(
     feedItemDisplaySettings: FeedItemDisplaySettings,
     revealArticleId: String?,
     onArticleRevealed: () -> Unit,
+    onItemsPagedPast: (Collection<String>) -> Unit,
+    onSourceClick: (FeedSource) -> Unit,
+    flipTabContext: FlipTabContext,
     modifier: Modifier = Modifier,
 ) {
-    if (feedLayout != FeedLayout.BIG_IMAGE) {
-        FeedList(
-            modifier = modifier,
-            feedItems = feedItems,
-            revealArticleId = revealArticleId,
-            onArticleRevealed = onArticleRevealed,
-            listState = listState,
-            gridState = gridState,
-            contentPadding = contentPadding,
-            feedFontSize = feedFontSize,
-            nextFeedState = nextFeedState,
-            shareCommentsMenuLabel = shareCommentsMenuLabel,
-            shareMenuLabel = shareMenuLabel,
-            currentFeedFilter = currentFeedFilter,
-            swipeActions = swipeActions,
-            requestMoreItems = requestMoreItems,
-            onGridArrangementChanged = onGridArrangementChanged,
-            onFeedItemClick = onFeedItemClick,
-            onOpenInBrowser = onOpenInBrowser,
-            onBookmarkClick = onBookmarkClick,
-            onReadStatusClick = onReadStatusClick,
-            onCommentClick = onCommentClick,
-            onVisibleFeedItemsChanged = onVisibleFeedItemsChanged,
-            markAllAsRead = markAllAsRead,
-            onShareClick = onShareClick,
-            onOpenFeedSettings = onOpenFeedSettings,
-            onOpenFeedWebsite = onOpenFeedWebsite,
-            feedLayout = feedLayout,
-            isGridLayoutEnabled = isGridLayoutEnabled,
-            onMarkAllAboveAsRead = onMarkAllAboveAsRead,
-            onMarkAllBelowAsRead = onMarkAllBelowAsRead,
-            onNavigateNext = onNavigateNext,
-            feedItemDisplaySettings = feedItemDisplaySettings,
-        )
-        return
-    }
+    val feedStyle = rememberFeedStyle(feedLayout)
 
-    // The magazine is always a single scrolling column.
+    // Magazine and Flip are always a single column; the regular list reports its own arrangement.
     val latestOnGridArrangementChanged by rememberUpdatedState(onGridArrangementChanged)
-    SideEffect(Unit) { latestOnGridArrangementChanged(false) }
+    SideEffect(feedLayout) {
+        if (feedLayout == FeedLayout.BIG_IMAGE) latestOnGridArrangementChanged(false)
+    }
 
     val actions = remember(
         currentFeedFilter,
@@ -117,6 +91,7 @@ internal fun HomeFeedList(
         onOpenFeedWebsite,
         onMarkAllAboveAsRead,
         onMarkAllBelowAsRead,
+        onSourceClick,
     ) {
         MagazineStoryActions(
             currentFeedFilter = currentFeedFilter,
@@ -133,21 +108,73 @@ internal fun HomeFeedList(
             onOpenFeedWebsite = onOpenFeedWebsite,
             onMarkAllAboveAsRead = onMarkAllAboveAsRead,
             onMarkAllBelowAsRead = onMarkAllBelowAsRead,
+            onSourceClick = onSourceClick,
         )
     }
-    MagazineFeedList(
-        modifier = modifier,
-        feedItems = feedItems,
-        actions = actions,
-        isRefreshing = isRefreshing,
-        nextFeedState = nextFeedState,
-        listState = listState,
-        contentPadding = contentPadding,
-        onVisibleFeedItemsChanged = onVisibleFeedItemsChanged,
-        requestMoreItems = requestMoreItems,
-        markAllAsRead = markAllAsRead,
-        onNavigateNext = onNavigateNext,
-        revealArticleId = revealArticleId,
-        onArticleRevealed = onArticleRevealed,
-    )
+    when {
+        feedLayout != FeedLayout.BIG_IMAGE ->
+            FeedList(
+                modifier = modifier,
+                feedItems = feedItems,
+                revealArticleId = revealArticleId,
+                onArticleRevealed = onArticleRevealed,
+                listState = listState,
+                gridState = gridState,
+                contentPadding = contentPadding,
+                feedFontSize = feedFontSize,
+                nextFeedState = nextFeedState,
+                shareCommentsMenuLabel = shareCommentsMenuLabel,
+                shareMenuLabel = shareMenuLabel,
+                currentFeedFilter = currentFeedFilter,
+                swipeActions = swipeActions,
+                requestMoreItems = requestMoreItems,
+                onGridArrangementChanged = onGridArrangementChanged,
+                onFeedItemClick = onFeedItemClick,
+                onOpenInBrowser = onOpenInBrowser,
+                onBookmarkClick = onBookmarkClick,
+                onReadStatusClick = onReadStatusClick,
+                onCommentClick = onCommentClick,
+                onVisibleFeedItemsChanged = onVisibleFeedItemsChanged,
+                markAllAsRead = markAllAsRead,
+                onShareClick = onShareClick,
+                onOpenFeedSettings = onOpenFeedSettings,
+                onOpenFeedWebsite = onOpenFeedWebsite,
+                feedLayout = feedLayout,
+                isGridLayoutEnabled = isGridLayoutEnabled,
+                onMarkAllAboveAsRead = onMarkAllAboveAsRead,
+                onMarkAllBelowAsRead = onMarkAllBelowAsRead,
+                onNavigateNext = onNavigateNext,
+                feedItemDisplaySettings = feedItemDisplaySettings,
+            )
+
+        feedStyle == FeedStyle.FLIP ->
+            FlipFeedPager(
+                modifier = modifier,
+                feedItems = feedItems,
+                actions = actions,
+                isRefreshing = isRefreshing,
+                topPadding = contentPadding.calculateTopPadding(),
+                onItemsPagedPast = onItemsPagedPast,
+                requestMoreItems = requestMoreItems,
+                currentTabName = flipTabContext.currentTabName,
+                nextCategory = flipTabContext.nextCategory,
+            )
+
+        else ->
+            MagazineFeedList(
+                modifier = modifier,
+                feedItems = feedItems,
+                actions = actions,
+                isRefreshing = isRefreshing,
+                nextFeedState = nextFeedState,
+                listState = listState,
+                contentPadding = contentPadding,
+                onVisibleFeedItemsChanged = onVisibleFeedItemsChanged,
+                requestMoreItems = requestMoreItems,
+                markAllAsRead = markAllAsRead,
+                onNavigateNext = onNavigateNext,
+                revealArticleId = revealArticleId,
+                onArticleRevealed = onArticleRevealed,
+            )
+    }
 }

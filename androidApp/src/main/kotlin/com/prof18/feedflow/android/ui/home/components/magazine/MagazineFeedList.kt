@@ -152,7 +152,7 @@ private fun MagazineBlockView(
  * read stories on purpose, so nothing is folded there.
  */
 @Composable
-private fun rememberReadGrouping(currentFeedFilter: FeedFilter, isRefreshing: Boolean): (FeedItem) -> Boolean {
+internal fun rememberReadGrouping(currentFeedFilter: FeedFilter, isRefreshing: Boolean): (FeedItem) -> Boolean {
     var generation by remember { mutableIntStateOf(0) }
     var wasRefreshing by remember { mutableStateOf(isRefreshing) }
     SideEffect(isRefreshing) {

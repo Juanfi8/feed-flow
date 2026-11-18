@@ -18,6 +18,7 @@ import com.prof18.feedflow.android.feedverification.AndroidWebViewProfiles
 import com.prof18.feedflow.android.feedverification.AndroidWebsiteIdentityProvider
 import com.prof18.feedflow.android.feedverification.AndroidWebsiteProfileCleaner
 import com.prof18.feedflow.android.feedverification.WebViewProfiles
+import com.prof18.feedflow.android.home.FeedStyleSettings
 import com.prof18.feedflow.android.notifications.AndroidNotifier
 import com.prof18.feedflow.android.ui.utils.coilImageLoader
 import com.prof18.feedflow.android.widget.FeedFlowWidget
@@ -116,6 +117,7 @@ open class FeedFlowApp : Application(), SingletonImageLoader.Factory {
                             settingsRepository = get(),
                         )
                     }
+                    single { FeedStyleSettings(this@FeedFlowApp) }
                     single<GoogleDriveDataSourceAndroid> {
                         GoogleDriveAndroidDataSourceImpl(
                             context = this@FeedFlowApp,
