@@ -25,6 +25,7 @@ import com.prof18.feedflow.feedsync.feedbin.domain.FeedbinRepository
 import com.prof18.feedflow.feedsync.greader.domain.GReaderRepository
 import com.prof18.feedflow.shared.data.SettingsRepository
 import com.prof18.feedflow.shared.domain.contentprefetch.ContentPrefetchRepository
+import com.prof18.feedflow.shared.domain.feed.articleimage.ArticleImageEnhancer
 import com.prof18.feedflow.shared.domain.feed.httpcache.FeedHttpCacheStore
 import com.prof18.feedflow.shared.domain.feed.httpcache.FeedHttpValidators
 import com.prof18.feedflow.shared.domain.feed.httpcache.FeedRefreshScheduler
@@ -73,6 +74,7 @@ class FeedFetcherRepository internal constructor(
     private val feedHttpCacheStore: FeedHttpCacheStore,
     private val feedAttempt: FeedAttempt,
     private val recoveryRepository: FeedRecoveryRepository,
+    private val articleImageEnhancer: ArticleImageEnhancer,
 ) {
     private val fetchMutex = Mutex()
     private val feedToUpdate = hashSetOf<String>()
@@ -114,6 +116,10 @@ class FeedFetcherRepository internal constructor(
                     feedStateRepository.emitUpdateStatus(FinishedFeedUpdateStatus)
                 }
             }
+        }
+        // After the refresh has finished and released the lock, so it never delays the article list.
+        withContext(dispatcherProvider.io) {
+            articleImageEnhancer.enhanceRecentArticles()
         }
     }
 

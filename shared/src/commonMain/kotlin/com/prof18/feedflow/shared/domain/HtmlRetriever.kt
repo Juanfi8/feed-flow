@@ -17,8 +17,10 @@ import io.ktor.client.statement.request
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.readAvailable
 import io.ktor.utils.io.readBuffer
 import kotlinx.coroutines.CancellationException
+import kotlinx.io.Buffer
 import kotlinx.io.IOException
 import kotlinx.io.readByteArray
 
@@ -101,6 +103,62 @@ class HtmlRetriever(
             header(HttpHeaders.Accept, IMAGE_ACCEPT_HEADER)
         }.execute { response -> response.status }
 
+    /**
+     * Downloads only the start of a page, up to the end of its `<head>` (at most [MAX_HEAD_BYTES]),
+     * which is where article metadata lives. Retries once with the fallback user agent when the
+     * site blocks the first one. Returns null when the page cannot be read.
+     */
+    suspend fun retrieveHead(url: String): HtmlRetrievalResult.Content? {
+        if (!HttpHostValidator.isUrlSafeForHttpClient(url)) return null
+        return try {
+            val (status, content) = retrieveHeadAttempt(url, client)
+            if (content == null && status in FALLBACK_USER_AGENT_STATUSES) {
+                retrieveHeadAttempt(url, forbiddenFallbackClient).second
+            } else {
+                content
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            logger.d(e) { "Unable to retrieve the page head, skipping" }
+            null
+        }
+    }
+
+    private suspend fun retrieveHeadAttempt(
+        url: String,
+        requestClient: HttpClient,
+    ): Pair<HttpStatusCode, HtmlRetrievalResult.Content?> =
+        requestClient.prepareGet(url) {
+            header(HttpHeaders.Accept, READABLE_CONTENT_ACCEPT_HEADER)
+        }.execute { response ->
+            val contentTypeHeader = response.headers[HttpHeaders.ContentType]
+            if (!response.status.isSuccess() || !isReadableContentType(contentTypeHeader)) {
+                return@execute response.status to null
+            }
+            val channel = response.bodyAsChannel()
+            val bytes = Buffer()
+            val chunk = ByteArray(HEAD_CHUNK_BYTES)
+            val seen = StringBuilder()
+            var headEnded = false
+            while (!headEnded && bytes.size < MAX_HEAD_BYTES) {
+                val read = channel.readAvailable(chunk)
+                if (read > 0) {
+                    bytes.write(chunk, 0, read)
+                    seen.append(chunk.decodeToString(0, read))
+                    headEnded = seen.contains("</head>", ignoreCase = true)
+                    // Only the tail can still complete a tag split across chunks.
+                    if (seen.length > HEAD_END_TAIL) seen.deleteRange(0, seen.length - HEAD_END_TAIL)
+                } else {
+                    headEnded = true
+                }
+            }
+            response.status to HtmlRetrievalResult.Content(
+                html = ResponseTextDecoder.decode(bytes.readByteArray(), contentTypeHeader),
+                effectiveUrl = response.request.url.toString(),
+            )
+        }
+
     /** Validates and decodes HTML captured by a browser or a website session. */
     fun decodeCaptured(bytes: ByteArray, contentType: String?, effectiveUrl: String): HtmlRetrievalResult {
         if (!HttpHostValidator.isUrlSafeForHttpClient(effectiveUrl)) {
@@ -173,6 +231,9 @@ class HtmlRetriever(
 
     private companion object {
         private const val MAX_RESPONSE_BYTES = 5L * 1024 * 1024 // 5 MB
+        private const val MAX_HEAD_BYTES = 64L * 1024
+        private const val HEAD_CHUNK_BYTES = 4 * 1024
+        private const val HEAD_END_TAIL = 16
         private const val IMAGE_ACCEPT_HEADER = "image/*"
         private val MISSING_STATUSES = setOf(HttpStatusCode.NotFound, HttpStatusCode.Gone)
 

@@ -53,6 +53,8 @@ internal fun FeedListSettingsScreenContent(
     updateFontScale: (Int) -> Unit,
     feedStyle: FeedStyle,
     onFeedStyleSelected: (FeedStyle) -> Unit,
+    isArticleImageEnhancementEnabled: Boolean,
+    onArticleImageEnhancementChanged: (Boolean) -> Unit,
     setGridLayoutEnabled: (Boolean) -> Unit,
     setHideDescription: (Boolean) -> Unit,
     setHideImages: (Boolean) -> Unit,
@@ -181,6 +183,16 @@ internal fun FeedListSettingsScreenContent(
                         title = strings.settingsHideImages,
                         isChecked = state.isHideImagesEnabled,
                         onCheckedChange = setHideImages,
+                    )
+                }
+
+                item {
+                    SettingSwitchItem(
+                        title = stringResource(R.string.article_images_setting),
+                        supportingText = stringResource(R.string.article_images_setting_description),
+                        isChecked = isArticleImageEnhancementEnabled,
+                        onCheckedChange = onArticleImageEnhancementChanged,
+                        enabled = !state.isHideImagesEnabled,
                     )
                 }
 
@@ -375,6 +387,8 @@ private fun FeedListSettingsScreenContentPreview() {
             updateFontScale = {},
             feedStyle = FeedStyle.LIST,
             onFeedStyleSelected = {},
+            isArticleImageEnhancementEnabled = false,
+            onArticleImageEnhancementChanged = {},
             setGridLayoutEnabled = {},
             setHideDescription = {},
             setHideImages = {},

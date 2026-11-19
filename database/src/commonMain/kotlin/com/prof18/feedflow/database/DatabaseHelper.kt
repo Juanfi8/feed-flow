@@ -10,6 +10,7 @@ import app.cash.sqldelight.coroutines.mapToOneOrDefault
 import app.cash.sqldelight.db.SqlDriver
 import co.touchlab.kermit.Logger
 import com.prof18.feedflow.core.model.ArticleExportFilter
+import com.prof18.feedflow.core.model.ArticleImageCandidate
 import com.prof18.feedflow.core.model.ArticleNotificationPolicy
 import com.prof18.feedflow.core.model.ArticleOpenMode
 import com.prof18.feedflow.core.model.ArticleToNotify
@@ -1398,6 +1399,7 @@ class DatabaseHelper(
         dbRef.cloudPendingFeedOrCategoryChangeQueries.deleteAllCloudPendingFeedAndCategoryChanges()
         dbRef.cloudPendingArticleFlagQueries.deleteAllCloudSyncStates()
         dbRef.contentPrefetchQueueQueries.clearQueue()
+        dbRef.articleImageLookupQueries.clearLookups()
         dbRef.feedItemStatusQueries.deleteAllStatuses()
         dbRef.feedItemTempQueries.clearTempFeedItemIds()
         dbRef.deletedFeedItemsQueries.deleteAllDeletedFeedItems()
@@ -2088,6 +2090,36 @@ class DatabaseHelper(
                     url = item.url,
                     created_at = currentTimeMillis,
                 )
+            }
+        }
+
+    /** Newest articles whose page has not been checked for a better thumbnail yet. */
+    suspend fun getArticleImageCandidates(limit: Long): List<ArticleImageCandidate> =
+        withContext(backgroundDispatcher) {
+            dbRef.articleImageLookupQueries
+                .selectCandidates(limit)
+                .executeAsList()
+                .map { row ->
+                    ArticleImageCandidate(
+                        feedItemId = row.url_hash,
+                        url = row.url,
+                        imageUrl = row.image_url,
+                        feedSourceLogoUrl = row.feed_source_logo_url,
+                    )
+                }
+        }
+
+    /**
+     * Records that these articles were checked, and saves the better thumbnail found for some of
+     * them (a null image keeps the current one).
+     */
+    suspend fun saveArticleImageLookups(results: Map<String, String?>, lookedUpAt: Long) =
+        dbRef.transactionWithContext(backgroundDispatcher, suspensionGuardReason = "Saving article thumbnails") {
+            results.forEach { (feedItemId, imageUrl) ->
+                if (imageUrl != null) {
+                    dbRef.feedItemQueries.updateImageUrl(image_url = imageUrl, url_hash = feedItemId)
+                }
+                dbRef.articleImageLookupQueries.insertLookup(feedItemId, lookedUpAt)
             }
         }
 

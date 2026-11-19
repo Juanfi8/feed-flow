@@ -1,0 +1,23 @@
+-- Articles whose page was already checked for a better thumbnail, so each is fetched at most once.
+CREATE TABLE article_image_lookup (
+    feed_item_id TEXT NOT NULL PRIMARY KEY,
+    looked_up_at INTEGER NOT NULL,
+    FOREIGN KEY (feed_item_id) REFERENCES feed_item(url_hash) ON DELETE CASCADE
+);
+
+insertLookup:
+INSERT OR REPLACE INTO article_image_lookup(feed_item_id, looked_up_at)
+VALUES (?, ?);
+
+selectCandidates:
+SELECT feed_item.url_hash, feed_item.url, feed_item.image_url, feed_source.logo_url AS feed_source_logo_url
+FROM feed_item
+INNER JOIN feed_source ON feed_item.feed_source_id = feed_source.url_hash
+LEFT JOIN article_image_lookup ON article_image_lookup.feed_item_id = feed_item.url_hash
+WHERE article_image_lookup.feed_item_id IS NULL
+AND (feed_item.url LIKE 'http://%' OR feed_item.url LIKE 'https://%')
+ORDER BY feed_item.pub_date DESC
+LIMIT :limit;
+
+clearLookups:
+DELETE FROM article_image_lookup;

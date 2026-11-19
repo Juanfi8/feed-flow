@@ -123,6 +123,7 @@ class FeedFetcherRepositoryLocalTest : FeedFetcherRepositoryTestBase() {
                             feedHttpCacheStore = get(),
                             feedAttempt = get(),
                             recoveryRepository = get(),
+                            articleImageEnhancer = get(),
                         )
                     }
                 },

@@ -90,6 +90,11 @@ class SettingsRepository(
     internal val markFeedAsReadWhenScrollingFlow: StateFlow<Boolean> =
         markFeedAsReadWhenScrollingMutableFlow.asStateFlow()
 
+    private val articleImageEnhancementMutableFlow = MutableStateFlow(getArticleImageEnhancementEnabled())
+
+    /** Whether articles without a good thumbnail get one from their page's metadata. */
+    val articleImageEnhancementFlow: StateFlow<Boolean> = articleImageEnhancementMutableFlow.asStateFlow()
+
     private val hideReadItemsMutableFlow = MutableStateFlow(getHideReadItems())
     internal val hideReadItemsFlow: StateFlow<Boolean> = hideReadItemsMutableFlow.asStateFlow()
 
@@ -132,6 +137,14 @@ class SettingsRepository(
         } else {
             settings[SettingsFields.ARTICLE_BROWSER_ID.name] = oldFavourite
         }
+    }
+
+    fun getArticleImageEnhancementEnabled(): Boolean =
+        settings.getBoolean(SettingsFields.ARTICLE_IMAGE_ENHANCEMENT.name, false)
+
+    fun setArticleImageEnhancementEnabled(value: Boolean) {
+        settings.set(SettingsFields.ARTICLE_IMAGE_ENHANCEMENT.name, value)
+        articleImageEnhancementMutableFlow.update { value }
     }
 
     internal fun getMarkFeedAsReadWhenScrolling(): Boolean =
@@ -413,6 +426,7 @@ private enum class SettingsFields {
     READER_CONTENT_CACHE_VERSION,
     FAVOURITE_BROWSER_ID,
     MARK_FEED_AS_READ_WHEN_SCROLLING,
+    ARTICLE_IMAGE_ENHANCEMENT,
     SHOW_READ_ARTICLES_TIMELINE,
     HIDE_READ_ITEMS,
     USE_READER_MODE,
