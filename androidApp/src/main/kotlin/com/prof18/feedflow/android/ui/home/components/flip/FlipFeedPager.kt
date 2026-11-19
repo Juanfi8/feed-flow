@@ -38,7 +38,12 @@ import kotlin.math.absoluteValue
 private const val FULL_TURN = 180f
 private const val HALF = 0.5f
 private const val FOLD_MAX_SHADE = 0.4f
-private const val FOLD_CAMERA_DISTANCE = 18f
+
+// RenderNode measures camera distance in units of 72 px. Keeping the camera eight half-pages away
+// gives a mostly flat turn: the leaf grows by under 15% at its steepest instead of rushing at
+// the reader (a fixed distance zoomed it several times on tall screens).
+private const val FOLD_CAMERA_HALF_PAGES = 8f
+private const val RENDER_NODE_CAMERA_UNIT_PX = 72f
 
 // Ask for more stories this many pages before the end.
 private const val PAGINATION_PAGES_LEFT = 3
@@ -151,7 +156,7 @@ private fun Modifier.foldTransition(
                 }
             }
             layer.pivotOffset = Offset(size.width / 2f, middle)
-            layer.cameraDistance = FOLD_CAMERA_DISTANCE
+            layer.cameraDistance = FOLD_CAMERA_HALF_PAGES * middle / RENDER_NODE_CAMERA_UNIT_PX
             layer.rotationX = angle
             drawLayer(layer)
         }
