@@ -43,6 +43,7 @@ import com.prof18.feedflow.shared.domain.feed.FeedSourcesRepository
 import com.prof18.feedflow.shared.domain.feed.FeedStateRepository
 import com.prof18.feedflow.shared.domain.feed.FeedUrlRetriever
 import com.prof18.feedflow.shared.domain.feed.FeedWidgetRepository
+import com.prof18.feedflow.shared.domain.feed.NewsSitemapReader
 import com.prof18.feedflow.shared.domain.feed.PendingReadStatusActionRetrier
 import com.prof18.feedflow.shared.domain.feed.articleimage.ArticleImageEnhancer
 import com.prof18.feedflow.shared.domain.feed.httpcache.FeedHttpCacheStore
@@ -759,6 +760,13 @@ private fun getCoreModule(appConfig: AppConfig) = module {
             feedAttempt = get(),
             recoveryRepository = get(),
             articleImageEnhancer = get(),
+        )
+    }
+
+    single {
+        NewsSitemapReader(
+            htmlRetriever = get(),
+            logger = getWith("NewsSitemapReader"),
         )
     }
 

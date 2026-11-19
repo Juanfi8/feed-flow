@@ -18,6 +18,7 @@ import com.prof18.feedflow.shared.domain.FeedDownloadWorkerEnqueuer
 import com.prof18.feedflow.shared.domain.contentprefetch.BackgroundPrefetchScheduler
 import com.prof18.feedflow.shared.domain.contentprefetch.ContentPrefetchWorker
 import com.prof18.feedflow.shared.domain.contentprefetch.WorkManagerBackgroundPrefetchScheduler
+import com.prof18.feedflow.shared.domain.feed.NewsSitemapReader
 import com.prof18.feedflow.shared.domain.feed.RssParserWrapper
 import com.prof18.feedflow.shared.domain.feed.RssParserWrapperImpl
 import com.prof18.feedflow.shared.domain.feed.httpcache.FeedHttpCacheStore
@@ -79,6 +80,7 @@ internal actual fun getPlatformModule(appEnvironment: AppEnvironment): Module = 
                     feedHttpCacheStore = feedHttpCacheStore,
                 )::getRssChannel,
             ),
+            readNewsSitemap = get<NewsSitemapReader>()::read,
         )
     }
 

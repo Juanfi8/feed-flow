@@ -13,6 +13,7 @@ import com.prof18.feedflow.core.model.ArticleExportFilter
 import com.prof18.feedflow.core.model.ArticleImageCandidate
 import com.prof18.feedflow.core.model.ArticleNotificationPolicy
 import com.prof18.feedflow.core.model.ArticleOpenMode
+import com.prof18.feedflow.core.model.ArticlePageMetadata
 import com.prof18.feedflow.core.model.ArticleToNotify
 import com.prof18.feedflow.core.model.AudioEnclosure
 import com.prof18.feedflow.core.model.CategoryWithUnreadCount
@@ -2104,21 +2105,21 @@ class DatabaseHelper(
                         feedItemId = row.url_hash,
                         url = row.url,
                         imageUrl = row.image_url,
+                        subtitle = row.subtitle,
                         feedSourceLogoUrl = row.feed_source_logo_url,
                     )
                 }
         }
 
     /**
-     * Records that these articles were checked, and saves the better thumbnail found for some of
-     * them (a null image keeps the current one).
+     * Records that these articles were checked, and saves what their pages added: a better
+     * thumbnail and a summary for those that had none (null fields keep the current values).
      */
-    suspend fun saveArticleImageLookups(results: Map<String, String?>, lookedUpAt: Long) =
-        dbRef.transactionWithContext(backgroundDispatcher, suspensionGuardReason = "Saving article thumbnails") {
-            results.forEach { (feedItemId, imageUrl) ->
-                if (imageUrl != null) {
-                    dbRef.feedItemQueries.updateImageUrl(image_url = imageUrl, url_hash = feedItemId)
-                }
+    suspend fun saveArticlePageLookups(results: Map<String, ArticlePageMetadata>, lookedUpAt: Long) =
+        dbRef.transactionWithContext(backgroundDispatcher, suspensionGuardReason = "Saving article page details") {
+            results.forEach { (feedItemId, metadata) ->
+                metadata.imageUrl?.let { dbRef.feedItemQueries.updateImageUrl(image_url = it, url_hash = feedItemId) }
+                metadata.description?.let { dbRef.feedItemQueries.updateSubtitle(subtitle = it, url_hash = feedItemId) }
                 dbRef.articleImageLookupQueries.insertLookup(feedItemId, lookedUpAt)
             }
         }

@@ -3,6 +3,7 @@ package com.prof18.feedflow.shared.domain.feed.articleimage
 import co.touchlab.kermit.Logger
 import com.prof18.feedflow.core.domain.DateFormatter
 import com.prof18.feedflow.core.model.ArticleImageCandidate
+import com.prof18.feedflow.core.model.ArticlePageMetadata
 import com.prof18.feedflow.database.DatabaseHelper
 import com.prof18.feedflow.shared.data.SettingsRepository
 import com.prof18.feedflow.shared.domain.HtmlRetriever
@@ -15,8 +16,9 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
 /**
- * Gives recent articles a better thumbnail when their feed has none or only a low-quality one, by
- * reading the share image (`og:image`, Twitter card, ...) declared in the article page's `<head>`.
+ * Gives recent articles a better thumbnail when their feed has none or only a low-quality one, and
+ * a summary when they have none (news sitemaps never do), from the share metadata (`og:image`,
+ * `og:description`, Twitter card, ...) declared in the article page's `<head>`.
  *
  * Runs after a refresh when the setting is on. Each article is checked once: the result, image or
  * not, is remembered, so pages are not downloaded again on the next refresh. Only pages that could
@@ -45,10 +47,10 @@ internal class ArticleImageEnhancer(
         val candidates = databaseHelper.getArticleImageCandidates(limit = CANDIDATE_WINDOW)
         if (candidates.isEmpty()) return
 
-        val (needsImage, alreadyGood) = candidates.partition { candidate ->
-            ArticleImageMetadata.isLowQuality(candidate.imageUrl, candidate.feedSourceLogoUrl)
+        val (needsPage, alreadyGood) = candidates.partition { candidate ->
+            candidate.needsImage() || candidate.needsSummary()
         }
-        val lookups = needsImage.take(MAX_LOOKUPS_PER_RUN)
+        val lookups = needsPage.take(MAX_LOOKUPS_PER_RUN)
         val semaphore = Semaphore(MAX_PARALLEL_LOOKUPS)
         val found = coroutineScope {
             lookups.map { candidate ->
@@ -56,28 +58,35 @@ internal class ArticleImageEnhancer(
             }.awaitAll()
         }
 
-        // Good feed images need no page; unreadable pages are left for a later refresh.
-        val results = alreadyGood.associate { it.feedItemId to null } +
-            found.mapNotNull { (feedItemId, lookup) -> lookup?.let { feedItemId to it.imageUrl } }
+        // Complete articles need no page; unreadable pages are left for a later refresh.
+        val results = alreadyGood.associate { it.feedItemId to ArticlePageMetadata() } +
+            found.mapNotNull { (feedItemId, metadata) -> metadata?.let { feedItemId to it } }
         if (results.isEmpty()) return
-        databaseHelper.saveArticleImageLookups(results, lookedUpAt = dateFormatter.currentTimeMillis())
+        databaseHelper.saveArticlePageLookups(results, lookedUpAt = dateFormatter.currentTimeMillis())
 
-        val improved = results.values.count { it != null }
+        val improved = results.values.count { it.imageUrl != null || it.description != null }
         if (improved > 0) {
-            logger.d { "Found better thumbnails for $improved articles" }
+            logger.d { "Completed $improved articles from their pages" }
             feedStateRepository.publishFetchedFeeds()
         }
     }
 
-    /** Null when the page could not be read; otherwise the share image, if any is better. */
-    private suspend fun lookUp(candidate: ArticleImageCandidate): Lookup? {
+    /** Null when the page could not be read; otherwise what the page adds to the article. */
+    private suspend fun lookUp(candidate: ArticleImageCandidate): ArticlePageMetadata? {
         val head = htmlRetriever.retrieveHead(candidate.url) ?: return null
-        val image = ArticleImageMetadata.extractImageUrl(head.html, head.effectiveUrl)
-            ?.takeIf { it != candidate.imageUrl }
-        return Lookup(image)
+        val image = if (candidate.needsImage()) {
+            ArticleImageMetadata.extractImageUrl(head.html, head.effectiveUrl)?.takeIf { it != candidate.imageUrl }
+        } else {
+            null
+        }
+        val description = if (candidate.needsSummary()) ArticleImageMetadata.extractDescription(head.html) else null
+        return ArticlePageMetadata(imageUrl = image, description = description)
     }
 
-    private data class Lookup(val imageUrl: String?)
+    private fun ArticleImageCandidate.needsImage(): Boolean =
+        ArticleImageMetadata.isLowQuality(imageUrl, feedSourceLogoUrl)
+
+    private fun ArticleImageCandidate.needsSummary(): Boolean = subtitle.isNullOrBlank()
 
     private companion object {
         // The newest articles not checked yet; older ones are rarely looked at again.

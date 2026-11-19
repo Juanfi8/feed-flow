@@ -14,6 +14,6 @@
     <string name="flip_next_category">Flip to %1$s</string>
     <string name="flip_page_of">%1$d of %2$d</string>
     <string name="flip_open_feed">Show only %1$s</string>
-    <string name="article_images_setting">Better thumbnails from article pages</string>
-    <string name="article_images_setting_description">For articles with a missing or tiny image, use the share image from the article page. Each new article page is checked once, after a refresh.</string>
+    <string name="article_images_setting">Thumbnails and summaries from article pages</string>
+    <string name="article_images_setting_description">For articles with a missing or tiny image, or no summary, use the share image and description from the article page. Each new article page is checked once, after a refresh. Needed for summaries in news sitemap feeds.</string>
 </resources>

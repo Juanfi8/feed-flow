@@ -24,6 +24,17 @@ internal object ArticleImageMetadata {
         "meta[itemprop=image]" to "content",
     )
 
+    private val descriptionSelectors = listOf(
+        "meta[property=og:description]",
+        "meta[name=og:description]",
+        "meta[name=twitter:description]",
+        "meta[property=twitter:description]",
+        "meta[name=description]",
+    )
+
+    // Long enough for a few lines on a card; pages sometimes put whole paragraphs here.
+    private const val MAX_DESCRIPTION_CHARS = 400
+
     private val genericMarkers = listOf(
         "favicon",
         "1x1",
@@ -72,6 +83,22 @@ internal object ArticleImageMetadata {
         }
         return null
     }
+
+    /** The page's own summary of the article, from its share or search metadata. */
+    fun extractDescription(html: String): String? {
+        val document = try {
+            Ksoup.parse(html)
+        } catch (_: Exception) {
+            return null
+        }
+        return descriptionSelectors.asSequence()
+            .flatMap { selector -> document.select(selector).asSequence() }
+            .map { element -> element.attr("content").replace(whitespace, " ").trim() }
+            .firstOrNull { it.isNotEmpty() }
+            ?.let { if (it.length > MAX_DESCRIPTION_CHARS) it.take(MAX_DESCRIPTION_CHARS).trimEnd() + "…" else it }
+    }
+
+    private val whitespace = Regex("""\s+""")
 
     /**
      * Whether a feed's image is missing, a generic image (logo, icon, tracking pixel, the feed's own

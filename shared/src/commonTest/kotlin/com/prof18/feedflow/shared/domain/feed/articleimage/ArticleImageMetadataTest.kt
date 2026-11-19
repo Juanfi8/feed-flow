@@ -45,6 +45,21 @@ class ArticleImageMetadataTest {
     }
 
     @Test
+    fun `descriptions come from share metadata first, then the search description`() {
+        val html = head(
+            """<meta name="description" content="Search text">""",
+            """<meta property="og:description" content="  Share${"\n"}   text  ">""",
+        )
+
+        assertEquals("Share text", ArticleImageMetadata.extractDescription(html))
+        assertEquals(
+            "Search text",
+            ArticleImageMetadata.extractDescription(head("""<meta name="description" content="Search text">""")),
+        )
+        assertNull(ArticleImageMetadata.extractDescription(head("<title>Story</title>")))
+    }
+
+    @Test
     fun `pages without share images give nothing`() {
         assertNull(ArticleImageMetadata.extractImageUrl(head("<title>Story</title>"), "https://example.com/a"))
     }

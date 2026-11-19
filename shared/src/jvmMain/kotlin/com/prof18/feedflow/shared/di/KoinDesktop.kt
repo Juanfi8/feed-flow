@@ -21,6 +21,7 @@ import com.prof18.feedflow.shared.domain.DatabaseCloser
 import com.prof18.feedflow.shared.domain.DesktopAutoRefreshScheduler
 import com.prof18.feedflow.shared.domain.contentprefetch.BackgroundPrefetchScheduler
 import com.prof18.feedflow.shared.domain.contentprefetch.CoroutineBackgroundPrefetchScheduler
+import com.prof18.feedflow.shared.domain.feed.NewsSitemapReader
 import com.prof18.feedflow.shared.domain.feed.RssParserWrapper
 import com.prof18.feedflow.shared.domain.feed.RssParserWrapperImpl
 import com.prof18.feedflow.shared.domain.feed.httpcache.FeedHttpCacheStore
@@ -100,6 +101,7 @@ internal actual fun getPlatformModule(appEnvironment: AppEnvironment): Module = 
                     feedHttpCacheStore = feedHttpCacheStore,
                 )::getRssChannel,
             ),
+            readNewsSitemap = get<NewsSitemapReader>()::read,
         )
     }
 

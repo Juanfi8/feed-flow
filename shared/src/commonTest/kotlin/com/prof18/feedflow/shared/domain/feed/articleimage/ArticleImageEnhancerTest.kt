@@ -53,7 +53,7 @@ class ArticleImageEnhancerTest : KoinTestBase() {
             buildFeedItem(id = "no-image", title = "A", pubDateMillis = 3000, source = source),
             buildFeedItem(id = "small", title = "B", pubDateMillis = 2000, source = source)
                 .copy(imageUrl = "https://example.com/small-150x150.jpg"),
-            buildFeedItem(id = "good", title = "C", pubDateMillis = 1000, source = source)
+            buildFeedItem(id = "good", title = "C", pubDateMillis = 1000, source = source, subtitle = "Kept")
                 .copy(imageUrl = "https://example.com/big.jpg"),
         )
         val enhancer = enhancer()
@@ -65,10 +65,27 @@ class ArticleImageEnhancerTest : KoinTestBase() {
         assertEquals("https://example.com/media/no-image.jpg", images["no-image"])
         assertEquals("https://example.com/media/small.jpg", images["small"])
         assertEquals("https://example.com/big.jpg", images["good"])
+        val summaries = summariesById()
+        assertEquals("Summary of /no-image", summaries["no-image"])
+        assertEquals("Kept", summaries["good"])
         assertEquals(
             listOf("https://example.com/no-image", "https://example.com/small"),
             requestedUrls.sorted(),
         )
+    }
+
+    @Test
+    fun `articles with a good image but no summary only get the summary`() = runTest(testDispatcher) {
+        settingsRepository.setArticleImageEnhancementEnabled(true)
+        insert(
+            buildFeedItem(id = "sitemap", title = "A", pubDateMillis = 1000, source = source)
+                .copy(imageUrl = "https://example.com/full.jpg"),
+        )
+
+        enhancer().enhanceRecentArticles()
+
+        assertEquals("https://example.com/full.jpg", imagesById()["sitemap"])
+        assertEquals("Summary of /sitemap", summariesById()["sitemap"])
     }
 
     @Test
@@ -102,7 +119,8 @@ class ArticleImageEnhancerTest : KoinTestBase() {
                 val path = request.url.encodedPath
                 requestedUrls += request.url.toString()
                 respond(
-                    content = """<html><head><meta property="og:image" content="/media$path.jpg"></head>""" +
+                    content = """<html><head><meta property="og:image" content="/media$path.jpg">""" +
+                        """<meta property="og:description" content="Summary of $path"></head>""" +
                         "<body>${"x".repeat(1000)}</body></html>",
                     status = HttpStatusCode.OK,
                     headers = headersOf("Content-Type", "text/html; charset=utf-8"),
@@ -116,10 +134,14 @@ class ArticleImageEnhancerTest : KoinTestBase() {
         databaseHelper.insertFeedItems(items.toList(), lastSyncTimestamp = 0)
     }
 
-    private suspend fun imagesById(): Map<String, String?> = databaseHelper.getFeedItems(
+    private suspend fun imagesById(): Map<String, String?> = dbItems().associate { it.url_hash to it.image_url }
+
+    private suspend fun summariesById(): Map<String, String?> = dbItems().associate { it.url_hash to it.subtitle }
+
+    private suspend fun dbItems() = databaseHelper.getFeedItems(
         feedFilter = FeedFilter.Timeline,
         pageSize = 100,
         showReadItems = true,
         sortOrder = FeedOrder.NEWEST_FIRST,
-    ).associate { it.url_hash to it.image_url }
+    )
 }

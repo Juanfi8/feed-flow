@@ -26,6 +26,9 @@ CREATE INDEX idx_feed_item_timeline ON feed_item(feed_source_id, is_read, is_blo
 updateImageUrl:
 UPDATE feed_item SET image_url = :image_url WHERE url_hash = :url_hash;
 
+updateSubtitle:
+UPDATE feed_item SET subtitle = :subtitle WHERE url_hash = :url_hash;
+
 insertFeedItem:
 INSERT OR IGNORE INTO feed_item(url_hash, url, title, subtitle, content, image_url, feed_source_id, pub_date, comments_url, audio_url)
 VALUES (?,?,?,?,?,?,?,?,?,?);
