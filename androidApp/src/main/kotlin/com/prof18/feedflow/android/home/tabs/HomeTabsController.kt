@@ -123,7 +123,8 @@ internal fun rememberHomeTabsController(
 
 /**
  * The tab strip layer of the home screen. Tapping the open tab goes back to the whole category
- * when a single feed is open, otherwise it scrolls to the top.
+ * when a single feed is open, otherwise it reloads the tab: back to the top, refreshed, with read
+ * stories folded away again.
  */
 @Composable
 internal fun HomeTabsLayer(
@@ -133,7 +134,7 @@ internal fun HomeTabsLayer(
     statusBarHeight: Dp,
     containerColor: Color,
     onFilterSelected: (FeedFilter) -> Unit,
-    onScrollToTop: () -> Unit,
+    onReload: () -> Unit,
     navigationButton: @Composable () -> Unit,
     actions: @Composable () -> Unit,
     modifier: Modifier = Modifier,
@@ -156,7 +157,7 @@ internal fun HomeTabsLayer(
                 onFilterSelected(controller.tabs[controller.selectedIndex].filter)
             } else {
                 controller.collapse.expand()
-                onScrollToTop()
+                onReload()
             }
         },
     )

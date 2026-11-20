@@ -189,11 +189,9 @@ fun AdaptiveHomeView(
         val homeTabs = remember(displayState.navDrawerState) { buildHomeTabs(displayState.navDrawerState) }
         val selectedTabIndex = homeTabs.selectedTabIndex(displayState.currentFeedFilter)
 
+        // Each tab keeps its own place, so swiping to it does not scroll.
         fun openTab(index: Int) {
             feedManagementActions.onFeedFilterSelected(homeTabs[index].filter)
-            scope.launch {
-                listState.scrollToItemConditionally(0, reduceMotionEnabled = reduceMotionEnabled)
-            }
         }
 
         // Swiping the list steps through the category tabs. With tabs, the swipe stops at All feeds

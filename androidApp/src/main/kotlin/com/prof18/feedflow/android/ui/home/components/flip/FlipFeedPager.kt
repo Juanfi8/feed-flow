@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
 import com.prof18.feedflow.android.ui.home.components.magazine.MagazineStoryActions
 import com.prof18.feedflow.android.ui.home.components.magazine.rememberReadGrouping
+import com.prof18.feedflow.android.ui.home.components.position.SavedFeedPosition
+import com.prof18.feedflow.android.ui.home.components.position.indexOfSaved
+import com.prof18.feedflow.android.ui.home.components.position.rememberFeedPosition
 import com.prof18.feedflow.android.ui.utils.LocalReduceMotion
 import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.FeedItem
@@ -56,7 +59,7 @@ private const val PAGINATION_PAGES_LEFT = 3
 internal fun FlipFeedPager(
     feedItems: ImmutableList<FeedItem>,
     actions: MagazineStoryActions,
-    isRefreshing: Boolean,
+    reloadGeneration: Int,
     topPadding: Dp,
     onItemsPagedPast: (Collection<String>) -> Unit,
     requestMoreItems: () -> Unit,
@@ -65,7 +68,7 @@ internal fun FlipFeedPager(
     modifier: Modifier = Modifier,
 ) {
     val currentFeedFilter = actions.currentFeedFilter
-    val isGroupedAsRead = rememberReadGrouping(currentFeedFilter, isRefreshing)
+    val isGroupedAsRead = rememberReadGrouping(currentFeedFilter, reloadGeneration)
     val pages = remember(feedItems, isGroupedAsRead, currentFeedFilter) {
         buildFlipPages(
             items = feedItems,
@@ -75,8 +78,24 @@ internal fun FlipFeedPager(
     }
     val pagerState = rememberPagerState(pageCount = { pages.size })
 
-    LaunchedEffect(currentFeedFilter) { pagerState.scrollToPage(0) }
-    MarkPagesReadWhenPassed(pagerState, pages, onItemsPagedPast)
+    val isRestoringPlace = rememberFeedPosition(
+        filter = currentFeedFilter,
+        style = "flip",
+        reloadGeneration = reloadGeneration,
+        stories = feedItems,
+        current = {
+            pages.getOrNull(pagerState.settledPage)?.let { page ->
+                SavedFeedPosition(key = page.key, itemIds = page.items.map { it.id })
+            }
+        },
+        restore = { saved ->
+            val index = pages.indexOfSaved(saved, keyOf = { it.key }, itemIdsOf = { page -> page.items.map { it.id } })
+            if (index != null) pagerState.scrollToPage(index)
+            index != null
+        },
+        scrollToTop = { pagerState.scrollToPage(0) },
+    )
+    MarkPagesReadWhenPassed(pagerState, pages, isRestoring = { isRestoringPlace.value }, onItemsPagedPast)
     PaginateNearLastPage(pagerState, pages.size, requestMoreItems)
 
     val reduceMotion = LocalReduceMotion.current
@@ -182,19 +201,24 @@ private fun Modifier.foldTransition(
 /** Distance of [index] from the settled position: positive above it, negative below. */
 private fun PagerState.offsetOf(index: Int): Float = (currentPage - index) + currentPageOffsetFraction
 
-/** Pages flipped past, in either order, have their stories marked read (once each). */
+/** Pages flipped past have their stories marked read (once each); restoring a saved page does not count. */
 @Composable
 private fun MarkPagesReadWhenPassed(
     pagerState: PagerState,
     pages: List<FlipPage>,
+    isRestoring: () -> Boolean,
     onItemsPagedPast: (Collection<String>) -> Unit,
 ) {
     val latestPages by rememberUpdatedState(pages)
+    val latestIsRestoring by rememberUpdatedState(isRestoring)
     val latestCallback by rememberUpdatedState(onItemsPagedPast)
     LaunchedEffect(pagerState) {
         var furthest = pagerState.settledPage
         snapshotFlow { pagerState.settledPage }.collect { settled ->
-            if (settled > furthest) {
+            if (latestIsRestoring()) {
+                // Jumping back to a saved page is not reading the pages before it.
+                furthest = settled
+            } else if (settled > furthest) {
                 val passed = latestPages.subList(furthest.coerceAtLeast(0), settled.coerceAtMost(latestPages.size))
                     .flatMap { page -> page.items.map { it.id } }
                 if (passed.isNotEmpty()) latestCallback(passed)

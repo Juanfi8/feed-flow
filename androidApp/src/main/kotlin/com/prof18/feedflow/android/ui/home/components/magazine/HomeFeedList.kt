@@ -5,15 +5,21 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.prof18.feedflow.android.home.FeedStyle
 import com.prof18.feedflow.android.home.rememberFeedStyle
 import com.prof18.feedflow.android.home.tabs.FlipTabContext
 import com.prof18.feedflow.android.ui.home.components.flip.FlipFeedPager
 import com.prof18.feedflow.android.ui.home.components.list.FeedList
+import com.prof18.feedflow.android.ui.home.components.position.SavedFeedPosition
+import com.prof18.feedflow.android.ui.home.components.position.indexOfSaved
+import com.prof18.feedflow.android.ui.home.components.position.rememberFeedPosition
 import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.FeedFontSizes
 import com.prof18.feedflow.core.model.FeedItem
@@ -33,7 +39,7 @@ import kotlinx.collections.immutable.ImmutableList
 @Composable
 internal fun HomeFeedList(
     feedItems: ImmutableList<FeedItem>,
-    isRefreshing: Boolean,
+    reloadGeneration: Int,
     nextFeedState: NextFeedDisplayState,
     feedFontSize: FeedFontSizes,
     feedLayout: FeedLayout,
@@ -112,7 +118,16 @@ internal fun HomeFeedList(
         )
     }
     when {
-        feedLayout != FeedLayout.BIG_IMAGE ->
+        feedLayout != FeedLayout.BIG_IMAGE -> {
+            var isGridArrangement by remember { mutableStateOf(false) }
+            val isRestoringPlace = rememberListFeedPosition(
+                filter = currentFeedFilter,
+                reloadGeneration = reloadGeneration,
+                feedItems = feedItems,
+                isGridArrangement = isGridArrangement,
+                listState = listState,
+                gridState = gridState,
+            )
             FeedList(
                 modifier = modifier,
                 feedItems = feedItems,
@@ -128,13 +143,18 @@ internal fun HomeFeedList(
                 currentFeedFilter = currentFeedFilter,
                 swipeActions = swipeActions,
                 requestMoreItems = requestMoreItems,
-                onGridArrangementChanged = onGridArrangementChanged,
+                onGridArrangementChanged = { isGrid ->
+                    isGridArrangement = isGrid
+                    onGridArrangementChanged(isGrid)
+                },
                 onFeedItemClick = onFeedItemClick,
                 onOpenInBrowser = onOpenInBrowser,
                 onBookmarkClick = onBookmarkClick,
                 onReadStatusClick = onReadStatusClick,
                 onCommentClick = onCommentClick,
-                onVisibleFeedItemsChanged = onVisibleFeedItemsChanged,
+                onVisibleFeedItemsChanged = { visible ->
+                    if (!isRestoringPlace.value) onVisibleFeedItemsChanged(visible)
+                },
                 markAllAsRead = markAllAsRead,
                 onShareClick = onShareClick,
                 onOpenFeedSettings = onOpenFeedSettings,
@@ -146,13 +166,14 @@ internal fun HomeFeedList(
                 onNavigateNext = onNavigateNext,
                 feedItemDisplaySettings = feedItemDisplaySettings,
             )
+        }
 
         feedStyle == FeedStyle.FLIP ->
             FlipFeedPager(
                 modifier = modifier,
                 feedItems = feedItems,
                 actions = actions,
-                isRefreshing = isRefreshing,
+                reloadGeneration = reloadGeneration,
                 topPadding = contentPadding.calculateTopPadding(),
                 onItemsPagedPast = onItemsPagedPast,
                 requestMoreItems = requestMoreItems,
@@ -165,7 +186,7 @@ internal fun HomeFeedList(
                 modifier = modifier,
                 feedItems = feedItems,
                 actions = actions,
-                isRefreshing = isRefreshing,
+                reloadGeneration = reloadGeneration,
                 nextFeedState = nextFeedState,
                 listState = listState,
                 contentPadding = contentPadding,
@@ -178,3 +199,49 @@ internal fun HomeFeedList(
             )
     }
 }
+
+/** Keeps the place in List and Card styles by the article at the top of the list or grid. */
+@Composable
+private fun rememberListFeedPosition(
+    filter: FeedFilter,
+    reloadGeneration: Int,
+    feedItems: ImmutableList<FeedItem>,
+    isGridArrangement: Boolean,
+    listState: LazyListState,
+    gridState: LazyStaggeredGridState,
+): State<Boolean> =
+    rememberFeedPosition(
+        filter = filter,
+        style = "list",
+        reloadGeneration = reloadGeneration,
+        stories = feedItems,
+        current = {
+            val index = if (isGridArrangement) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex
+            val offset = if (isGridArrangement) {
+                gridState.firstVisibleItemScrollOffset
+            } else {
+                listState.firstVisibleItemScrollOffset
+            }
+            feedItems.getOrNull(index)?.let { item ->
+                SavedFeedPosition(
+                    key = item.id,
+                    itemIds = feedItems.drop(index).take(NEARBY_ARTICLES).map { it.id },
+                    offset = offset,
+                )
+            }
+        },
+        restore = { saved ->
+            val index = feedItems.indexOfSaved(saved, keyOf = { it.id }, itemIdsOf = { listOf(it.id) })
+            if (index != null) {
+                val offset = if (feedItems[index].id == saved.key) saved.offset else 0
+                if (isGridArrangement) gridState.scrollToItem(index, offset) else listState.scrollToItem(index, offset)
+            }
+            index != null
+        },
+        scrollToTop = {
+            if (isGridArrangement) gridState.scrollToItem(0) else listState.scrollToItem(0)
+        },
+    )
+
+// Articles remembered below the saved one, to find the place again if it is gone.
+private const val NEARBY_ARTICLES = 4

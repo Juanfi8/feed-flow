@@ -10,19 +10,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
 import com.prof18.feedflow.android.ui.home.components.list.FeedFooterButtons
 import com.prof18.feedflow.android.ui.home.components.list.PullToNextIndicator
 import com.prof18.feedflow.android.ui.home.components.list.PullToNextLayout
+import com.prof18.feedflow.android.ui.home.components.position.ReadGroupingStore
+import com.prof18.feedflow.android.ui.home.components.position.SavedFeedPosition
+import com.prof18.feedflow.android.ui.home.components.position.indexOfSaved
+import com.prof18.feedflow.android.ui.home.components.position.rememberFeedPosition
 import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.FeedItem
 import com.prof18.feedflow.core.model.VisibleFeedItem
@@ -44,7 +43,7 @@ private const val PAGINATION_THRESHOLD = 8
 internal fun MagazineFeedList(
     feedItems: ImmutableList<FeedItem>,
     actions: MagazineStoryActions,
-    isRefreshing: Boolean,
+    reloadGeneration: Int,
     nextFeedState: NextFeedDisplayState,
     listState: LazyListState,
     contentPadding: PaddingValues,
@@ -57,7 +56,7 @@ internal fun MagazineFeedList(
     onArticleRevealed: () -> Unit = {},
 ) {
     val currentFeedFilter = actions.currentFeedFilter
-    val isGroupedAsRead = rememberReadGrouping(currentFeedFilter, isRefreshing)
+    val isGroupedAsRead = rememberReadGrouping(currentFeedFilter, reloadGeneration)
     val readRowsShown = remember(currentFeedFilter) { mutableStateMapOf<Long, Int>() }
     val zoneId = remember { ZoneId.systemDefault() }
     val todayEpochDay = LocalDate.now(zoneId).toEpochDay()
@@ -72,8 +71,25 @@ internal fun MagazineFeedList(
         )
     }
 
+    val isRestoringPlace = rememberFeedPosition(
+        filter = currentFeedFilter,
+        style = "magazine",
+        reloadGeneration = reloadGeneration,
+        stories = feedItems,
+        current = { listState.currentMagazinePosition(blocks) },
+        restore = { saved ->
+            val index = blocks.indexOfSaved(saved, keyOf = { it.key }, itemIdsOf = { it.itemIds })
+            if (index != null) {
+                listState.scrollToItem(index, if (blocks[index].key == saved.key) saved.offset else 0)
+            }
+            index != null
+        },
+        scrollToTop = { listState.scrollToItem(0) },
+    )
     RevealStoryEffect(revealArticleId, blocks, listState, onArticleRevealed)
-    ReportVisibleStories(blocks, feedItems, listState, onVisibleFeedItemsChanged)
+    ReportVisibleStories(blocks, feedItems, listState) { visible ->
+        if (!isRestoringPlace.value) onVisibleFeedItemsChanged(visible)
+    }
     PaginateNearEnd(listState, requestMoreItems)
 
     PullToNextLayout(
@@ -146,24 +162,17 @@ private fun MagazineBlockView(
 }
 
 /**
- * Decides once per story whether it sits in its day's read group, so stories read while scrolling
- * dim in place instead of jumping away. The decision is taken again when the feed reloads: a new
- * tab or filter, a finished refresh, or coming back to the app. The Read and Bookmarks views show
- * read stories on purpose, so nothing is folded there.
+ * Decides once per story whether it sits in its day's read group, so stories read while reading
+ * dim in place instead of jumping away. The decisions last until the reader reloads the feed
+ * (tapping its tab or pulling to refresh), which [reloadGeneration] counts; switching tabs or coming
+ * back from an article keeps them. The Read and Bookmarks views show read stories on purpose, so
+ * nothing is folded there.
  */
 @Composable
-internal fun rememberReadGrouping(currentFeedFilter: FeedFilter, isRefreshing: Boolean): (FeedItem) -> Boolean {
-    var generation by remember { mutableIntStateOf(0) }
-    var wasRefreshing by remember { mutableStateOf(isRefreshing) }
-    SideEffect(isRefreshing) {
-        if (wasRefreshing && !isRefreshing) generation++
-        wasRefreshing = isRefreshing
-    }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { generation++ }
-
+internal fun rememberReadGrouping(currentFeedFilter: FeedFilter, reloadGeneration: Int): (FeedItem) -> Boolean {
     val foldsRead = currentFeedFilter !is FeedFilter.Read && currentFeedFilter !is FeedFilter.Bookmarks
-    return remember(currentFeedFilter, generation) {
-        val decisions = HashMap<String, Boolean>()
+    return remember(currentFeedFilter, reloadGeneration) {
+        val decisions = ReadGroupingStore.decisionsFor(currentFeedFilter)
         val grouping: (FeedItem) -> Boolean = { item ->
             foldsRead && decisions.getOrPut(item.id) { item.isRead }
         }
@@ -231,3 +240,14 @@ private fun RevealStoryEffect(
         }
     }
 }
+
+/** The row at the top of the magazine, with the stories it (or the next row) shows. */
+private fun LazyListState.currentMagazinePosition(blocks: List<MagazineBlock>): SavedFeedPosition? {
+    val index = firstVisibleItemIndex
+    val block = blocks.getOrNull(index) ?: return null
+    val nearbyStories = blocks.drop(index).asSequence().flatMap { it.itemIds }.take(NEARBY_STORIES).toList()
+    return SavedFeedPosition(key = block.key, itemIds = nearbyStories, offset = firstVisibleItemScrollOffset)
+}
+
+// Stories remembered around the saved row, to find the place again if that row regroups.
+private const val NEARBY_STORIES = 4

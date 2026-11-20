@@ -70,6 +70,7 @@ import com.prof18.feedflow.android.ui.home.components.NoFeedsSourceView
 import com.prof18.feedflow.android.ui.home.components.ScrollToTopButton
 import com.prof18.feedflow.android.ui.home.components.list.FeedListMaxContentWidth
 import com.prof18.feedflow.android.ui.home.components.magazine.HomeFeedList
+import com.prof18.feedflow.android.ui.home.components.position.rememberFeedReloader
 import com.prof18.feedflow.android.ui.style.Spacing
 import com.prof18.feedflow.android.ui.utils.LocalFeedFlowStrings
 import com.prof18.feedflow.android.ui.utils.LocalReduceMotion
@@ -138,10 +139,10 @@ fun AndroidHomeScreenContent(
             )
         }
     }
-    val selectFilter: (FeedFilter) -> Unit = { feedFilter ->
-        feedManagementActions.onFeedFilterSelected(feedFilter)
-        scrollToTop()
-    }
+    // Each tab keeps its own place (see RememberFeedPosition), so switching does not scroll.
+    val selectFilter: (FeedFilter) -> Unit = feedManagementActions.onFeedFilterSelected
+    val feedReloader = rememberFeedReloader(onScrollToTop = scrollToTop, onRefresh = onRefresh)
+    val reloadCurrentFeed: () -> Unit = { feedReloader.reload(displayState.currentFeedFilter) }
 
     @Suppress("MagicNumber")
     val showScrollToTopButton by remember {
@@ -275,7 +276,7 @@ fun AndroidHomeScreenContent(
                         modifier = Modifier.fillMaxSize(),
                         state = pullToRefreshState,
                         isRefreshing = isRefreshing,
-                        onRefresh = onRefresh,
+                        onRefresh = reloadCurrentFeed,
                         indicator = {
                             PullToRefreshIndicator(
                                 state = pullToRefreshState,
@@ -327,7 +328,7 @@ fun AndroidHomeScreenContent(
                                     ) {
                                         HomeFeedList(
                                             modifier = Modifier.fillMaxSize(),
-                                            isRefreshing = isRefreshing,
+                                            reloadGeneration = feedReloader.generation,
                                             onItemsPagedPast = feedListActions.onFeedItemsPagedPast,
                                             onSourceClick = { source -> selectFilter(FeedFilter.Source(source)) },
                                             flipTabContext = flipTabContext,
@@ -431,7 +432,7 @@ fun AndroidHomeScreenContent(
                 statusBarHeight = statusBarHeight,
                 containerColor = contentContainerColor,
                 onFilterSelected = selectFilter,
-                onScrollToTop = scrollToTop,
+                onReload = reloadCurrentFeed,
                 showDrawerMenu = showDrawerMenu,
                 isDrawerOpen = isDrawerOpen,
                 onDrawerMenuClick = onDrawerMenuClick,
@@ -598,7 +599,7 @@ private fun HomeHeader(
     statusBarHeight: Dp,
     containerColor: Color,
     onFilterSelected: (FeedFilter) -> Unit,
-    onScrollToTop: () -> Unit,
+    onReload: () -> Unit,
     showDrawerMenu: Boolean,
     isDrawerOpen: Boolean,
     onDrawerMenuClick: () -> Unit,
@@ -639,7 +640,7 @@ private fun HomeHeader(
         statusBarHeight = statusBarHeight,
         containerColor = containerColor,
         onFilterSelected = onFilterSelected,
-        onScrollToTop = onScrollToTop,
+        onReload = onReload,
         navigationButton = {
             if (showDrawerMenu) {
                 DrawerIcon(onDrawerMenuClick = onDrawerMenuClick, isDrawerOpen = isDrawerOpen)
