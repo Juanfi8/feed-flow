@@ -12,6 +12,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import com.prof18.feedflow.core.model.FeedFilter
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -147,6 +149,10 @@ private const val STORIES_WAIT_MILLIS = 1_500L
  * Reloading the open feed on purpose (tapping its tab, pulling to refresh): it forgets the saved
  * place and the folding of read stories, goes back to the top and refreshes. [generation] counts
  * reloads so the feed styles can start over.
+ *
+ * Tapping the open tab takes two steps: away from the top it first goes back there, and once at
+ * the top it reloads. Paged styles report their own start through [isPagedFeed] and
+ * [isPagedAtStart], and follow [scrollToTopRequests].
  */
 @Stable
 internal class FeedReloader(
@@ -155,6 +161,23 @@ internal class FeedReloader(
 ) {
     var generation by mutableIntStateOf(0)
         private set
+
+    var isListAtTop: Boolean = true
+    var isPagedFeed: Boolean = false
+    var isPagedAtStart: Boolean = true
+
+    private val topRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val scrollToTopRequests: SharedFlow<Unit> = topRequests
+
+    fun tapOpenTab(filter: FeedFilter) {
+        val isAtTop = if (isPagedFeed) isPagedAtStart else isListAtTop
+        if (isAtTop) {
+            reload(filter)
+        } else {
+            onScrollToTop()
+            topRequests.tryEmit(Unit)
+        }
+    }
 
     fun reload(filter: FeedFilter) {
         FeedPositionStore.forget(filter)

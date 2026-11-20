@@ -54,11 +54,11 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.prof18.feedflow.android.home.tabs.HomeTabsController
 import com.prof18.feedflow.android.home.tabs.HomeTabsLayer
+import com.prof18.feedflow.android.home.tabs.HomeTabsPager
 import com.prof18.feedflow.android.home.tabs.flipTabContext
 import com.prof18.feedflow.android.home.tabs.rememberHomeTabsController
 import com.prof18.feedflow.android.ui.components.ConfirmationDialog
@@ -143,6 +143,7 @@ fun AndroidHomeScreenContent(
     val selectFilter: (FeedFilter) -> Unit = feedManagementActions.onFeedFilterSelected
     val feedReloader = rememberFeedReloader(onScrollToTop = scrollToTop, onRefresh = onRefresh)
     val reloadCurrentFeed: () -> Unit = { feedReloader.reload(displayState.currentFeedFilter) }
+    val isPagedFeed = rememberFeedStyle(displayState.feedLayout).isPaged
 
     @Suppress("MagicNumber")
     val showScrollToTopButton by remember {
@@ -162,13 +163,15 @@ fun AndroidHomeScreenContent(
     val isListAtTop by remember {
         derivedStateOf { isFeedAtTop(isGridArrangement, listState, gridState) }
     }
+    SideEffect(isListAtTop, isPagedFeed) {
+        feedReloader.isListAtTop = isListAtTop
+        feedReloader.isPagedFeed = isPagedFeed
+    }
     val homeTabs = rememberHomeTabsController(
         navDrawerState = displayState.navDrawerState,
         currentFeedFilter = displayState.currentFeedFilter,
-        reduceMotionEnabled = reduceMotionEnabled,
         isListAtTop = { isListAtTop },
-        feedItems = displayState.feedItems,
-        isPaged = rememberFeedStyle(displayState.feedLayout).isPaged,
+        isPaged = isPagedFeed,
     )
     val flipTabContext = homeTabs.flipTabContext(onFilterSelected = selectFilter)
     val headerCollapse = homeTabs.collapse
@@ -315,37 +318,35 @@ fun AndroidHomeScreenContent(
                                         isGridLayoutEnabled = displayState.isGridLayoutEnabled,
                                     )
 
-                                    Box(
-                                        modifier = feedListWidthModifier
-                                            .fillMaxHeight()
-                                            .graphicsLayer {
-                                                translationX = homeTabs.slideTranslationPx(
-                                                    density = this,
-                                                    isRtl = layoutDir == LayoutDirection.Rtl,
-                                                )
-                                                alpha = homeTabs.slideAlpha()
-                                            },
-                                    ) {
+                                    HomeTabsPager(
+                                        modifier = feedListWidthModifier.fillMaxHeight(),
+                                        controller = homeTabs,
+                                        currentFeedFilter = displayState.currentFeedFilter,
+                                        feedItems = displayState.feedItems,
+                                        liveListState = listState,
+                                        liveGridState = gridState,
+                                        onFilterSelected = selectFilter,
+                                    ) { pageFilter, pageStories, page ->
                                         HomeFeedList(
                                             modifier = Modifier.fillMaxSize(),
-                                            reloadGeneration = feedReloader.generation,
-                                            onItemsPagedPast = feedListActions.onFeedItemsPagedPast,
+                                            feedReloader = page.liveOr(feedReloader, null),
+                                            onItemsPagedPast = page.liveOr(feedListActions.onFeedItemsPagedPast) {},
                                             onSourceClick = { source -> selectFilter(FeedFilter.Source(source)) },
                                             flipTabContext = flipTabContext,
-                                            feedItems = displayState.feedItems,
-                                            revealArticleId = revealArticleId,
+                                            feedItems = pageStories,
+                                            revealArticleId = page.liveOr(revealArticleId, null),
                                             onArticleRevealed = onArticleRevealed,
-                                            listState = listState,
-                                            gridState = gridState,
+                                            listState = page.listState,
+                                            gridState = page.gridState,
                                             contentPadding = PaddingValues(top = feedListTopPadding),
                                             feedFontSize = displayState.feedFontSizes,
                                             nextFeedState = displayState.nextFeedDisplayState,
                                             shareCommentsMenuLabel = shareBehavior.shareCommentsTitle,
                                             shareMenuLabel = shareBehavior.shareLinkTitle,
-                                            currentFeedFilter = displayState.currentFeedFilter,
+                                            currentFeedFilter = pageFilter,
                                             swipeActions = displayState.swipeActions,
-                                            requestMoreItems = feedListActions.requestNewData,
-                                            onGridArrangementChanged = { isGridArrangement = it },
+                                            requestMoreItems = page.liveOr(feedListActions.requestNewData) {},
+                                            onGridArrangementChanged = page.liveOr({ isGridArrangement = it }) {},
                                             onFeedItemClick = { feedInfo ->
                                                 feedListActions.openUrl(feedInfo)
                                                 feedListActions.markAsRead(FeedItemId(feedInfo.id))
@@ -357,7 +358,10 @@ fun AndroidHomeScreenContent(
                                                 feedListActions.openUrl(feedInfo)
                                                 feedListActions.markAsRead(FeedItemId(feedInfo.id))
                                             },
-                                            onVisibleFeedItemsChanged = feedListActions.onVisibleFeedItemsChanged,
+                                            onVisibleFeedItemsChanged = page.liveOr(
+                                                live = feedListActions.onVisibleFeedItemsChanged,
+                                                preview = {},
+                                            ),
                                             markAllAsRead = markAllReadWithConfirmation,
                                             onShareClick = shareBehavior.onShareClick,
                                             onOpenFeedSettings = feedManagementActions.onEditFeedClick,
@@ -432,7 +436,7 @@ fun AndroidHomeScreenContent(
                 statusBarHeight = statusBarHeight,
                 containerColor = contentContainerColor,
                 onFilterSelected = selectFilter,
-                onReload = reloadCurrentFeed,
+                onReload = { feedReloader.tapOpenTab(displayState.currentFeedFilter) },
                 showDrawerMenu = showDrawerMenu,
                 isDrawerOpen = isDrawerOpen,
                 onDrawerMenuClick = onDrawerMenuClick,

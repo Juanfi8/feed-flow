@@ -1,48 +1,34 @@
 package com.prof18.feedflow.android.home.tabs
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.prof18.feedflow.android.ui.home.components.flip.NextCategory
 import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.NavDrawerState
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withTimeoutOrNull
-
-private val tabSwitchSlideDistance = 72.dp
-private const val TAB_SWITCH_OUT_MILLIS = 120
-
-// How long the new tab's stories may take to arrive before the list slides in anyway.
-private const val TAB_SWITCH_WAIT_MILLIS = 400L
+import kotlinx.coroutines.launch
 
 /**
  * Everything the home screen needs from the category tabs: which tabs exist, which one is open,
- * how tall the header is, and the scroll-linked collapse and tab-switch slide.
+ * how tall the header is, the scroll-linked collapse, and the pager that slides between tabs.
  */
 @Stable
 internal class HomeTabsController(
     val tabs: ImmutableList<HomeTab>,
     val selectedIndex: Int,
     val collapse: HomeHeaderCollapseState,
-    private val slide: Animatable<Float, *>,
+    val pagerState: PagerState,
     private val isPaged: Boolean,
 ) {
     val showTabs: Boolean get() = tabs.isNotEmpty()
@@ -60,51 +46,21 @@ internal class HomeTabsController(
         collapse.updateLimit(if (showFeedChips && !isPaged) HomeFeedChipsHeight.toPx() else 0f)
     }
 
-    /** Horizontal offset of the feed list while it slides in after a tab switch. */
-    fun slideTranslationPx(density: Density, isRtl: Boolean): Float = with(density) {
-        slide.value * (if (isRtl) -1f else 1f) * tabSwitchSlideDistance.toPx()
-    }
-
-    fun slideAlpha(): Float = 1f - kotlin.math.abs(slide.value).coerceAtMost(1f)
+    /** Where the feed pager is between tabs (2.5 is halfway from the third tab to the fourth). */
+    fun pagerPosition(): Float = pagerState.currentPage + pagerState.currentPageOffsetFraction
 }
 
 @Composable
 internal fun rememberHomeTabsController(
     navDrawerState: NavDrawerState,
     currentFeedFilter: FeedFilter,
-    reduceMotionEnabled: Boolean,
     isListAtTop: () -> Boolean,
-    feedItems: Any? = null,
     isPaged: Boolean = false,
 ): HomeTabsController {
     val tabs = remember(navDrawerState) { buildHomeTabs(navDrawerState) }
     val selectedIndex = remember(tabs, currentFeedFilter) { tabs.selectedTabIndex(currentFeedFilter) }
     val collapse = remember { HomeHeaderCollapseState() }
-    val slide = remember { Animatable(0f) }
-    var previousIndex by remember { mutableIntStateOf(selectedIndex) }
-
-    val latestFeedItems by rememberUpdatedState(feedItems)
-
-    // Switching tabs reads as moving along the strip: the old stories slide out and fade toward the
-    // tab being left, and the new ones slide in from the side of the tab being opened once they
-    // have loaded, so the old list never slides back in.
-    LaunchedEffect(selectedIndex) {
-        val from = previousIndex
-        previousIndex = selectedIndex
-        if (reduceMotionEnabled || from < 0 || selectedIndex < 0 || from == selectedIndex) {
-            return@LaunchedEffect
-        }
-        val direction = if (selectedIndex > from) 1f else -1f
-        val itemsBefore = latestFeedItems
-        slide.animateTo(-direction, tween(durationMillis = TAB_SWITCH_OUT_MILLIS, easing = FastOutLinearInEasing))
-        if (latestFeedItems === itemsBefore) {
-            withTimeoutOrNull(TAB_SWITCH_WAIT_MILLIS) {
-                snapshotFlow { latestFeedItems }.first { it !== itemsBefore }
-            }
-        }
-        slide.snapTo(direction)
-        slide.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
-    }
+    val pagerState = rememberPagerState(initialPage = selectedIndex.coerceAtLeast(0)) { tabs.size }
 
     // A list that reaches its top (scroll-to-top, new filter) shows the whole header again.
     val atTop = isListAtTop()
@@ -116,15 +72,14 @@ internal fun rememberHomeTabsController(
         tabs = tabs,
         selectedIndex = selectedIndex,
         collapse = collapse,
-        slide = slide,
+        pagerState = pagerState,
         isPaged = isPaged,
     )
 }
 
 /**
  * The tab strip layer of the home screen. Tapping the open tab goes back to the whole category
- * when a single feed is open, otherwise it reloads the tab: back to the top, refreshed, with read
- * stories folded away again.
+ * when a single feed is open; otherwise [onReload] decides (back to the top first, then reload).
  */
 @Composable
 internal fun HomeTabsLayer(
@@ -139,6 +94,7 @@ internal fun HomeTabsLayer(
     actions: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val scope = rememberCoroutineScope()
     if (!controller.showTabs) return
     HomeTabsOverlay(
         modifier = modifier,
@@ -151,6 +107,8 @@ internal fun HomeTabsLayer(
         containerColor = containerColor,
         navigationButton = navigationButton,
         actions = actions,
+        pagerPosition = controller::pagerPosition,
+        onDialStep = { index -> scope.launch { controller.pagerState.animateScrollToPage(index) } },
         onFilterSelected = onFilterSelected,
         onSelectedTabClick = {
             if (currentFeedFilter is FeedFilter.Source) {

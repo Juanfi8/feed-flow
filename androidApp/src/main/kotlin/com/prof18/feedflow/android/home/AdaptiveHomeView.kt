@@ -194,9 +194,9 @@ fun AdaptiveHomeView(
             feedManagementActions.onFeedFilterSelected(homeTabs[index].filter)
         }
 
-        // Swiping the list steps through the category tabs. With tabs, the swipe stops at All feeds
-        // instead of opening the drawer (the drawer button still does); without categories it
-        // keeps opening the drawer, as before tabs existed.
+        // While a tab is open the feed pager owns horizontal drags (it slides between tabs). Without
+        // tabs, or on Read and Bookmarks, a list swipe opens the drawer or steps into the tabs.
+        val pagerOwnsSwipes = homeTabs.isNotEmpty() && selectedTabIndex >= 0
         val onSwipeTowardDrawer by rememberUpdatedState {
             val previous = homeTabs.stepFrom(selectedTabIndex, forward = false)
             when {
@@ -259,14 +259,18 @@ fun AdaptiveHomeView(
             },
         ) {
             HomeContentInternal(
-                modifier = Modifier.claimHorizontalDragsForDrawer(
-                    isRtl = isRtl,
-                    // SwipeableActionsBox mirrors startActions in RTL, so rightSwipeAction is the
-                    // drawer-opening row action in both layout directions.
-                    drawerOpeningSwipeHasPriority = displayState.swipeActions.rightSwipeAction == NONE,
-                    onSwipeTowardDrawer = { onSwipeTowardDrawer() },
-                    onSwipeAwayFromDrawer = { onSwipeAwayFromDrawer() },
-                ),
+                modifier = if (pagerOwnsSwipes) {
+                    Modifier
+                } else {
+                    Modifier.claimHorizontalDragsForDrawer(
+                        isRtl = isRtl,
+                        // SwipeableActionsBox mirrors startActions in RTL, so rightSwipeAction is the
+                        // drawer-opening row action in both layout directions.
+                        drawerOpeningSwipeHasPriority = displayState.swipeActions.rightSwipeAction == NONE,
+                        onSwipeTowardDrawer = { onSwipeTowardDrawer() },
+                        onSwipeAwayFromDrawer = { onSwipeAwayFromDrawer() },
+                    )
+                },
                 showDrawerMenu = true,
                 onDrawerMenuClick = {
                     scope.launch {

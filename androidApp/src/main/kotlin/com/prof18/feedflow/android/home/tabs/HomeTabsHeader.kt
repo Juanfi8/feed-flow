@@ -1,8 +1,5 @@
 package com.prof18.feedflow.android.home.tabs
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -60,12 +57,16 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import com.prof18.feedflow.android.R
 import com.prof18.feedflow.android.ui.style.Spacing
 import com.prof18.feedflow.android.ui.utils.LocalFeedFlowStrings
 import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.FeedSource
 import kotlinx.collections.immutable.ImmutableList
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.roundToInt
 
 internal val HomeTabBarHeight = 56.dp
 internal val HomeFeedChipsHeight = 48.dp
@@ -85,13 +86,19 @@ internal fun HomeTabStrip(
     showCounts: Boolean,
     onTabSelected: (Int) -> Unit,
     onSelectedTabClick: () -> Unit,
+    position: () -> Float,
+    onDialStep: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()
     val haptics = LocalHapticFeedback.current
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     var dragPreviewIndex by remember { mutableStateOf<Int?>(null) }
-    val shownIndex = dragPreviewIndex ?: selectedIndex
+    // The feed pager's position drives the highlight and the underline, so both move with the
+    // finger whether the feed or the strip is dragged.
+    val pagerPosition = position()
+    val shownIndex = if (selectedIndex < 0) -1 else pagerPosition.roundToInt().coerceIn(0, tabs.lastIndex)
+    val currentOnDialStep by rememberUpdatedState(onDialStep)
     val tabBounds = remember { mutableStateMapOf<Int, IntRange>() }
     val currentSelectedIndex by rememberUpdatedState(selectedIndex)
     val currentOnTabSelected by rememberUpdatedState(onTabSelected)
@@ -140,6 +147,7 @@ internal fun HomeTabStrip(
                     if (index != before) {
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         dragPreviewIndex = index
+                        currentOnDialStep(index)
                     }
                 }
             }
@@ -161,29 +169,23 @@ internal fun HomeTabStrip(
                 )
             }
         }
-        if (shownIndex >= 0) SlidingTabIndicator(tabBounds[shownIndex])
+        if (shownIndex >= 0) SlidingTabIndicator(pagerPosition, tabBounds)
     }
 }
 
 private val TabHorizontalPadding = 12.dp
 private val TabIndicatorHeight = 3.dp
 
-/** One underline that glides between tabs, and follows the finger while dragging the strip. */
+/** One underline between tabs, following the feed pager: halfway through a slide it spans halfway. */
 @Composable
-private fun BoxScope.SlidingTabIndicator(bounds: IntRange?) {
-    if (bounds == null) return
+private fun BoxScope.SlidingTabIndicator(position: Float, tabBounds: Map<Int, IntRange>) {
+    val lower = floor(position).toInt()
+    val from = tabBounds[lower] ?: return
+    val to = tabBounds[ceil(position).toInt()] ?: from
+    val fraction = position - lower
     val inset = with(LocalDensity.current) { TabHorizontalPadding.roundToPx() }
-    val indicatorSpring = spring<Int>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
-    val start by animateIntAsState(
-        targetValue = bounds.first + inset,
-        animationSpec = indicatorSpring,
-        label = "tabIndicatorStart",
-    )
-    val width by animateIntAsState(
-        targetValue = bounds.last - bounds.first - 2 * inset,
-        animationSpec = indicatorSpring,
-        label = "tabIndicatorWidth",
-    )
+    val start = lerp(from.first, to.first, fraction) + inset
+    val width = lerp(from.last - from.first, to.last - to.first, fraction) - 2 * inset
     Box(
         modifier = Modifier
             .align(Alignment.BottomStart)

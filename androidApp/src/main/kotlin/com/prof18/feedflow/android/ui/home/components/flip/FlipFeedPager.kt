@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
 import com.prof18.feedflow.android.ui.home.components.magazine.MagazineStoryActions
 import com.prof18.feedflow.android.ui.home.components.magazine.rememberReadGrouping
+import com.prof18.feedflow.android.ui.home.components.position.FeedReloader
 import com.prof18.feedflow.android.ui.home.components.position.SavedFeedPosition
 import com.prof18.feedflow.android.ui.home.components.position.indexOfSaved
 import com.prof18.feedflow.android.ui.home.components.position.rememberFeedPosition
@@ -59,7 +60,7 @@ private const val PAGINATION_PAGES_LEFT = 3
 internal fun FlipFeedPager(
     feedItems: ImmutableList<FeedItem>,
     actions: MagazineStoryActions,
-    reloadGeneration: Int,
+    feedReloader: FeedReloader?,
     topPadding: Dp,
     onItemsPagedPast: (Collection<String>) -> Unit,
     requestMoreItems: () -> Unit,
@@ -68,6 +69,7 @@ internal fun FlipFeedPager(
     modifier: Modifier = Modifier,
 ) {
     val currentFeedFilter = actions.currentFeedFilter
+    val reloadGeneration = feedReloader?.generation ?: 0
     val isGroupedAsRead = rememberReadGrouping(currentFeedFilter, reloadGeneration)
     val pages = remember(feedItems, isGroupedAsRead, currentFeedFilter) {
         buildFlipPages(
@@ -95,6 +97,7 @@ internal fun FlipFeedPager(
         },
         scrollToTop = { pagerState.scrollToPage(0) },
     )
+    FollowOpenTabTaps(feedReloader, pagerState)
     MarkPagesReadWhenPassed(pagerState, pages, isRestoring = { isRestoringPlace.value }, onItemsPagedPast)
     PaginateNearLastPage(pagerState, pages.size, requestMoreItems)
 
@@ -238,5 +241,19 @@ private fun PaginateNearLastPage(pagerState: PagerState, pageCount: Int, request
     val latestRequestMoreItems by rememberUpdatedState(requestMoreItems)
     SideEffect(shouldPaginate) {
         if (shouldPaginate) latestRequestMoreItems()
+    }
+}
+
+/**
+ * Lets the first tap on the open tab bring the feed back to its first page, and tells the reloader
+ * whether it is already there (then the next tap reloads).
+ */
+@Composable
+private fun FollowOpenTabTaps(feedReloader: FeedReloader?, pagerState: PagerState) {
+    if (feedReloader == null) return
+    val isAtStart = pagerState.settledPage == 0
+    SideEffect(isAtStart) { feedReloader.isPagedAtStart = isAtStart }
+    LaunchedEffect(feedReloader, pagerState) {
+        feedReloader.scrollToTopRequests.collect { pagerState.animateScrollToPage(0) }
     }
 }

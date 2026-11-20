@@ -72,6 +72,8 @@ internal fun HomeTabsOverlay(
     containerColor: Color,
     onFilterSelected: (FeedFilter) -> Unit,
     onSelectedTabClick: () -> Unit,
+    pagerPosition: () -> Float,
+    onDialStep: (Int) -> Unit,
     navigationButton: @Composable () -> Unit,
     actions: @Composable () -> Unit,
     modifier: Modifier = Modifier,
@@ -114,6 +116,8 @@ internal fun HomeTabsOverlay(
                     showCounts = showCounts,
                     onTabSelected = { index -> onFilterSelected(tabs[index].filter) },
                     onSelectedTabClick = onSelectedTabClick,
+                    position = pagerPosition,
+                    onDialStep = onDialStep,
                 )
                 actions()
             }

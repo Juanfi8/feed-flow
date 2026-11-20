@@ -17,6 +17,7 @@ import com.prof18.feedflow.android.home.rememberFeedStyle
 import com.prof18.feedflow.android.home.tabs.FlipTabContext
 import com.prof18.feedflow.android.ui.home.components.flip.FlipFeedPager
 import com.prof18.feedflow.android.ui.home.components.list.FeedList
+import com.prof18.feedflow.android.ui.home.components.position.FeedReloader
 import com.prof18.feedflow.android.ui.home.components.position.SavedFeedPosition
 import com.prof18.feedflow.android.ui.home.components.position.indexOfSaved
 import com.prof18.feedflow.android.ui.home.components.position.rememberFeedPosition
@@ -39,7 +40,7 @@ import kotlinx.collections.immutable.ImmutableList
 @Composable
 internal fun HomeFeedList(
     feedItems: ImmutableList<FeedItem>,
-    reloadGeneration: Int,
+    feedReloader: FeedReloader?,
     nextFeedState: NextFeedDisplayState,
     feedFontSize: FeedFontSizes,
     feedLayout: FeedLayout,
@@ -75,6 +76,7 @@ internal fun HomeFeedList(
     modifier: Modifier = Modifier,
 ) {
     val feedStyle = rememberFeedStyle(feedLayout)
+    val reloadGeneration = feedReloader?.generation ?: 0
 
     // Magazine and Flip are always a single column; the regular list reports its own arrangement.
     val latestOnGridArrangementChanged by rememberUpdatedState(onGridArrangementChanged)
@@ -173,7 +175,7 @@ internal fun HomeFeedList(
                 modifier = modifier,
                 feedItems = feedItems,
                 actions = actions,
-                reloadGeneration = reloadGeneration,
+                feedReloader = feedReloader,
                 topPadding = contentPadding.calculateTopPadding(),
                 onItemsPagedPast = onItemsPagedPast,
                 requestMoreItems = requestMoreItems,
