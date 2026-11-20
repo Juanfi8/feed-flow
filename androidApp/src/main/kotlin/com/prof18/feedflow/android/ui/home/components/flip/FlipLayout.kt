@@ -86,6 +86,16 @@ internal fun mixSources(stories: List<FeedItem>): List<FeedItem> {
     return mixed
 }
 
+/**
+ * Stories on the pages the reader flipped past, going forward from the page with [fromKey] to the
+ * page at [toIndex]. Nothing when going back, or when that page is no longer there.
+ */
+internal fun List<FlipPage>.storiesFlippedPast(fromKey: String?, toIndex: Int): List<String> {
+    val from = indexOfFirst { it.key == fromKey }
+    if (from < 0 || toIndex <= from) return emptyList()
+    return subList(from, toIndex.coerceAtMost(size)).flatMap { page -> page.items.map { it.id } }
+}
+
 @Immutable
 internal sealed interface FlipPage {
     val key: String

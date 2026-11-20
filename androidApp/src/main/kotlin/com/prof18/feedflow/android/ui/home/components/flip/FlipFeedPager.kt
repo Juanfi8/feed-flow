@@ -1,5 +1,6 @@
 package com.prof18.feedflow.android.ui.home.components.flip
 
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -37,6 +38,7 @@ import com.prof18.feedflow.android.ui.utils.LocalReduceMotion
 import com.prof18.feedflow.core.model.FeedFilter
 import com.prof18.feedflow.core.model.FeedItem
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
 // Fold geometry: half a turn per page, the leaf upright at the halfway point.
@@ -72,14 +74,17 @@ internal fun FlipFeedPager(
     val currentFeedFilter = actions.currentFeedFilter
     val reloadGeneration = feedReloader?.generation ?: 0
     val isGroupedAsRead = rememberReadGrouping(currentFeedFilter, reloadGeneration)
-    val pages = remember(feedItems, isGroupedAsRead, currentFeedFilter) {
+    val isPreview = feedReloader == null
+    val pages = remember(feedItems, isGroupedAsRead, currentFeedFilter, isPreview) {
+        // A tab not opened yet has nothing to preview. No pages at all (rather than just the end
+        // page) so the pager cannot stay on "caught up" once the stories arrive.
+        if (isPreview && feedItems.isEmpty()) return@remember emptyList()
         buildFlipPages(
             items = feedItems,
             isGroupedAsRead = isGroupedAsRead,
             mixSources = currentFeedFilter is FeedFilter.Timeline,
         )
     }
-    val isPreview = feedReloader == null
     // Opening on the saved page (rather than page one, then jumping) avoids a flash when a tab
     // becomes the open one.
     val pagerState = rememberPagerState(
@@ -120,8 +125,6 @@ internal fun FlipFeedPager(
         beyondViewportPageCount = 1,
     ) { index ->
         val page = pages.getOrNull(index) ?: return@VerticalPager
-        // A tab not opened yet has no stories to preview: show a blank page, not "caught up".
-        if (isPreview && feedItems.isEmpty()) return@VerticalPager
         val topHalf = rememberGraphicsLayer()
         val bottomHalf = rememberGraphicsLayer()
         Box(
@@ -215,7 +218,11 @@ private fun Modifier.foldTransition(
 /** Distance of [index] from the settled position: positive above it, negative below. */
 private fun PagerState.offsetOf(index: Int): Float = (currentPage - index) + currentPageOffsetFraction
 
-/** Pages flipped past have their stories marked read (once each); restoring a saved page does not count. */
+/**
+ * Stories on the pages the reader flips past are marked read. Only a flip made with the finger
+ * counts: the pager also moves on its own (restoring a saved page, keeping its page when stories
+ * arrive or fold, going back to the first page), and none of that is reading.
+ */
 @Composable
 private fun MarkPagesReadWhenPassed(
     pagerState: PagerState,
@@ -227,20 +234,22 @@ private fun MarkPagesReadWhenPassed(
     val latestIsRestoring by rememberUpdatedState(isRestoring)
     val latestCallback by rememberUpdatedState(onItemsPagedPast)
     LaunchedEffect(pagerState) {
-        var furthest = pagerState.settledPage
-        snapshotFlow { pagerState.settledPage }.collect { settled ->
-            if (latestIsRestoring()) {
-                // Jumping back to a saved page is not reading the pages before it.
-                furthest = settled
-            } else if (settled > furthest) {
-                val passed = latestPages.subList(furthest.coerceAtLeast(0), settled.coerceAtMost(latestPages.size))
-                    .flatMap { page -> page.items.map { it.id } }
-                if (passed.isNotEmpty()) latestCallback(passed)
-                furthest = settled
-            } else if (settled == 0) {
-                furthest = 0
+        var userFlipped = false
+        launch {
+            pagerState.interactionSource.interactions.collect { interaction ->
+                if (interaction is DragInteraction.Start) userFlipped = true
             }
         }
+        var lastKey = latestPages.getOrNull(pagerState.settledPage)?.key
+        snapshotFlow { pagerState.settledPage to latestPages.getOrNull(pagerState.settledPage)?.key }
+            .collect { (settled, key) ->
+                if (userFlipped && !latestIsRestoring()) {
+                    val passed = latestPages.storiesFlippedPast(fromKey = lastKey, toIndex = settled)
+                    if (passed.isNotEmpty()) latestCallback(passed)
+                }
+                userFlipped = false
+                lastKey = key
+            }
     }
 }
 

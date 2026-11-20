@@ -80,6 +80,30 @@ class FlipLayoutTest {
         assertEquals("a1", mixed.first().id)
     }
 
+    @Test
+    fun `flipping forward marks the pages left behind`() {
+        val pages = buildFlipPages((1..8).map { story("i$it") }, isGroupedAsRead = { false }, mixSources = false)
+
+        assertEquals(listOf("i1", "i2", "i3"), pages.storiesFlippedPast(fromKey = "cover-i1", toIndex = 2))
+    }
+
+    @Test
+    fun `going back or jumping from a page that is gone marks nothing`() {
+        val pages = buildFlipPages((1..8).map { story("i$it") }, isGroupedAsRead = { false }, mixSources = false)
+
+        assertEquals(emptyList<String>(), pages.storiesFlippedPast(fromKey = "pair-i4", toIndex = 1))
+        assertEquals(emptyList<String>(), pages.storiesFlippedPast(fromKey = "pair-i4", toIndex = 2))
+        assertEquals(emptyList<String>(), pages.storiesFlippedPast(fromKey = "gone", toIndex = 5))
+    }
+
+    @Test
+    fun `landing on the end page from a page that is gone marks nothing`() {
+        // A tab opened for the first time: the preview had only the end page, then its stories arrive.
+        val pages = buildFlipPages((1..8).map { story("i$it") }, isGroupedAsRead = { false }, mixSources = false)
+
+        assertEquals(emptyList<String>(), pages.storiesFlippedPast(fromKey = null, toIndex = pages.lastIndex))
+    }
+
     private fun story(id: String, image: Boolean = true, read: Boolean = false, source: String = "s") = FeedItem(
         id = id,
         url = "https://example.com/$id",
