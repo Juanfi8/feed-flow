@@ -45,6 +45,7 @@ internal fun HomeTabsPager(
     liveGridState: LazyStaggeredGridState,
     onFilterSelected: (FeedFilter) -> Unit,
     modifier: Modifier = Modifier,
+    restartWhenLive: Boolean = true,
     page: @Composable (filter: FeedFilter, stories: ImmutableList<FeedItem>, scope: FeedPageScope) -> Unit,
 ) {
     val liveScope = FeedPageScope(isLive = true, listState = liveListState, gridState = liveGridState)
@@ -57,15 +58,13 @@ internal fun HomeTabsPager(
             feedItems = feedItems,
             liveScope = liveScope,
             onFilterSelected = onFilterSelected,
+            restartWhenLive = restartWhenLive,
             page = page,
             modifier = modifier,
         )
     }
 }
 
-// A page is redrawn from scratch when it turns live or back to a preview (see key(isLive)), so
-// reusing the page slot across the two branches is intended: each needs its own state anyway.
-@Suppress("ContentSlotReused")
 @Composable
 private fun TabPages(
     controller: HomeTabsController,
@@ -73,6 +72,7 @@ private fun TabPages(
     feedItems: ImmutableList<FeedItem>,
     liveScope: FeedPageScope,
     onFilterSelected: (FeedFilter) -> Unit,
+    restartWhenLive: Boolean,
     page: @Composable (filter: FeedFilter, stories: ImmutableList<FeedItem>, scope: FeedPageScope) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -89,19 +89,20 @@ private fun TabPages(
     ) { index ->
         val tab = controller.tabs.getOrNull(index) ?: return@HorizontalPager
         val isLive = controller.tabs.selectedTabIndex(liveFilter) == index
-        // A page turning live (or back to a preview) starts over, so it restores its saved place
-        // with the right list state.
-        key(isLive) {
-            if (isLive) {
-                page(currentFeedFilter, feedItems, liveScope)
-            } else {
-                val previewScope = FeedPageScope(
-                    isLive = false,
-                    listState = rememberLazyListState(),
-                    gridState = rememberLazyStaggeredGridState(),
-                )
-                page(tab.filter, TabStoriesCache.get(tab.filter) ?: persistentListOf(), previewScope)
-            }
+        val previewScope = FeedPageScope(
+            isLive = false,
+            listState = rememberLazyListState(),
+            gridState = rememberLazyStaggeredGridState(),
+        )
+        // Scrolling styles draw the open tab with the shared list state, so a page turning live
+        // starts over to restore its place in that state. Paged styles keep their own state: the
+        // page stays as it is and only swaps the cached stories for the live ones, without a flash.
+        key(if (restartWhenLive) isLive else Unit) {
+            page(
+                if (isLive) currentFeedFilter else tab.filter,
+                if (isLive) feedItems else TabStoriesCache.get(tab.filter) ?: persistentListOf(),
+                if (isLive) liveScope else previewScope,
+            )
         }
     }
 }

@@ -99,6 +99,10 @@ internal fun <T> List<T>.indexOfSaved(
  * place is restored once that feed's stories are shown. Without a saved place the feed opens at
  * the top. A reload ([reloadGeneration] changing, with the place forgotten) starts from the top.
  *
+ * A preview (a neighbouring tab drawn while sliding toward it, with [savesPosition] off) restores
+ * the place but never saves one: it may show old or no stories, and its place would be wrong for
+ * the real feed.
+ *
  * Returns whether a place is being restored. The jump to it is not reading, so callers that mark
  * stories read as they pass ignore what scrolls by meanwhile.
  */
@@ -111,7 +115,9 @@ internal fun rememberFeedPosition(
     current: () -> SavedFeedPosition?,
     restore: suspend (SavedFeedPosition) -> Boolean,
     scrollToTop: suspend () -> Unit,
+    savesPosition: Boolean = true,
 ): State<Boolean> {
+    val latestSavesPosition by rememberUpdatedState(savesPosition)
     val isRestoring = remember { mutableStateOf(true) }
     val latestStories by rememberUpdatedState(stories)
     val latestCurrent by rememberUpdatedState(current)
@@ -138,7 +144,7 @@ internal fun rememberFeedPosition(
         snapshotFlow { latestCurrent() }
             .filterNotNull()
             .distinctUntilChanged()
-            .collect { FeedPositionStore.save(filter, style, it) }
+            .collect { position -> if (latestSavesPosition) FeedPositionStore.save(filter, style, position) }
     }
     return isRestoring
 }

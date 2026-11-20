@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
 import com.prof18.feedflow.android.ui.home.components.magazine.MagazineStoryActions
 import com.prof18.feedflow.android.ui.home.components.magazine.rememberReadGrouping
+import com.prof18.feedflow.android.ui.home.components.position.FeedPositionStore
 import com.prof18.feedflow.android.ui.home.components.position.FeedReloader
 import com.prof18.feedflow.android.ui.home.components.position.SavedFeedPosition
 import com.prof18.feedflow.android.ui.home.components.position.indexOfSaved
@@ -78,18 +79,26 @@ internal fun FlipFeedPager(
             mixSources = currentFeedFilter is FeedFilter.Timeline,
         )
     }
-    val pagerState = rememberPagerState(pageCount = { pages.size })
+    val isPreview = feedReloader == null
+    // Opening on the saved page (rather than page one, then jumping) avoids a flash when a tab
+    // becomes the open one.
+    val pagerState = rememberPagerState(
+        initialPage = remember { pages.savedPageIndex(currentFeedFilter) ?: 0 },
+        pageCount = { pages.size },
+    )
 
     val isRestoringPlace = rememberFeedPosition(
         filter = currentFeedFilter,
         style = "flip",
         reloadGeneration = reloadGeneration,
         stories = feedItems,
+        // The end page is not a place to come back to: new stories may have arrived since.
         current = {
-            pages.getOrNull(pagerState.settledPage)?.let { page ->
+            pages.getOrNull(pagerState.settledPage)?.takeIf { it !is FlipPage.End }?.let { page ->
                 SavedFeedPosition(key = page.key, itemIds = page.items.map { it.id })
             }
         },
+        savesPosition = !isPreview,
         restore = { saved ->
             val index = pages.indexOfSaved(saved, keyOf = { it.key }, itemIdsOf = { page -> page.items.map { it.id } })
             if (index != null) pagerState.scrollToPage(index)
@@ -111,6 +120,8 @@ internal fun FlipFeedPager(
         beyondViewportPageCount = 1,
     ) { index ->
         val page = pages.getOrNull(index) ?: return@VerticalPager
+        // A tab not opened yet has no stories to preview: show a blank page, not "caught up".
+        if (isPreview && feedItems.isEmpty()) return@VerticalPager
         val topHalf = rememberGraphicsLayer()
         val bottomHalf = rememberGraphicsLayer()
         Box(
@@ -257,3 +268,7 @@ private fun FollowOpenTabTaps(feedReloader: FeedReloader?, pagerState: PagerStat
         feedReloader.scrollToTopRequests.collect { pagerState.animateScrollToPage(0) }
     }
 }
+
+private fun List<FlipPage>.savedPageIndex(filter: FeedFilter): Int? =
+    FeedPositionStore.get(filter, "flip")
+        ?.let { saved -> indexOfSaved(saved, keyOf = { it.key }, itemIdsOf = { page -> page.items.map { it.id } }) }

@@ -77,6 +77,8 @@ internal fun HomeFeedList(
 ) {
     val feedStyle = rememberFeedStyle(feedLayout)
     val reloadGeneration = feedReloader?.generation ?: 0
+    // Only the open tab has a reloader; neighbouring tabs drawn while sliding are previews.
+    val isPreview = feedReloader == null
 
     // Magazine and Flip are always a single column; the regular list reports its own arrangement.
     val latestOnGridArrangementChanged by rememberUpdatedState(onGridArrangementChanged)
@@ -123,6 +125,7 @@ internal fun HomeFeedList(
         feedLayout != FeedLayout.BIG_IMAGE -> {
             var isGridArrangement by remember { mutableStateOf(false) }
             val isRestoringPlace = rememberListFeedPosition(
+                isPreview = isPreview,
                 filter = currentFeedFilter,
                 reloadGeneration = reloadGeneration,
                 feedItems = feedItems,
@@ -189,6 +192,7 @@ internal fun HomeFeedList(
                 feedItems = feedItems,
                 actions = actions,
                 reloadGeneration = reloadGeneration,
+                isPreview = isPreview,
                 nextFeedState = nextFeedState,
                 listState = listState,
                 contentPadding = contentPadding,
@@ -205,6 +209,7 @@ internal fun HomeFeedList(
 /** Keeps the place in List and Card styles by the article at the top of the list or grid. */
 @Composable
 private fun rememberListFeedPosition(
+    isPreview: Boolean,
     filter: FeedFilter,
     reloadGeneration: Int,
     feedItems: ImmutableList<FeedItem>,
@@ -216,6 +221,7 @@ private fun rememberListFeedPosition(
         filter = filter,
         style = "list",
         reloadGeneration = reloadGeneration,
+        savesPosition = !isPreview,
         stories = feedItems,
         current = {
             val index = if (isGridArrangement) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex

@@ -326,6 +326,7 @@ fun AndroidHomeScreenContent(
                                         liveListState = listState,
                                         liveGridState = gridState,
                                         onFilterSelected = selectFilter,
+                                        restartWhenLive = !isPagedFeed,
                                     ) { pageFilter, pageStories, page ->
                                         HomeFeedList(
                                             modifier = Modifier.fillMaxSize(),

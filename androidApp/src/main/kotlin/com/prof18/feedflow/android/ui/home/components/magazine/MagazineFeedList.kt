@@ -44,6 +44,7 @@ internal fun MagazineFeedList(
     feedItems: ImmutableList<FeedItem>,
     actions: MagazineStoryActions,
     reloadGeneration: Int,
+    isPreview: Boolean,
     nextFeedState: NextFeedDisplayState,
     listState: LazyListState,
     contentPadding: PaddingValues,
@@ -75,6 +76,7 @@ internal fun MagazineFeedList(
         filter = currentFeedFilter,
         style = "magazine",
         reloadGeneration = reloadGeneration,
+        savesPosition = !isPreview,
         stories = feedItems,
         current = { listState.currentMagazinePosition(blocks) },
         restore = { saved ->
